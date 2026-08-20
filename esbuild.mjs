@@ -24,8 +24,15 @@ const extension = {
   // Imperative resolves plugins and credential managers at runtime with
   // dynamic require() calls that a bundler cannot follow — they ship in
   // node_modules instead (see .vscodeignore).
+  //
+  // @zowe/secrets-for-zowe-sdk is doubly external: it is a native module that
+  // loads a prebuilt .node binary, which a bundler cannot inline at all.
+  // Imperative declares it only as a devDependency and require()s it at
+  // runtime, so *we* have to depend on it — without it the credential manager
+  // fails to load and every secure value in zowe.config.json reads as empty.
   external: ['vscode', '@zowe/imperative', '@zowe/core-for-zowe-sdk',
-             '@zowe/zos-files-for-zowe-sdk', '@zowe/zos-jobs-for-zowe-sdk'],
+             '@zowe/zos-files-for-zowe-sdk', '@zowe/zos-jobs-for-zowe-sdk',
+             '@zowe/secrets-for-zowe-sdk'],
 };
 
 const webview = {

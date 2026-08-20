@@ -77,6 +77,27 @@ særtilfælde, men bare `source.read()` efterfulgt af `target.write()`.
   managers med dynamiske `require()`, som en bundler ikke kan følge. De er
   markeret `external` i `esbuild.mjs` og ligger i `node_modules`.
 
+## Om credential manageren
+
+`@zowe/imperative` læser secure-værdier fra zowe.config.json via
+`@zowe/secrets-for-zowe-sdk` — et native modul den kun har som *devDependency*
+og `require()`'er ved kørsel. Den skal derfor stå i vores egne `dependencies`,
+ellers logger Imperative kun
+
+```
+Failed to load Keytar module: Cannot find module '@zowe/secrets-for-zowe-sdk'
+```
+
+og fortsætter med alle brugernavne og kodeord tomme. Fejlen dukker først op
+meget senere som en 401, så `src/zowe/sessions.ts` tjekker eksplicit at der er
+login-oplysninger og siger det med rene ord i stedet.
+
+Ved pakning til `.vsix`: modulet er `external` i esbuild og følger med i
+`node_modules`. Hvis du på et tidspunkt vælger at bundle Zowe-pakkerne, skal
+`prebuilds/`-mappen med de native binærer kopieres op ved siden af
+`package.json` i extension-roden — se
+[EXTENDERS.md i secrets-pakken](https://github.com/zowe/zowe-cli/blob/master/packages/secrets/EXTENDERS.md).
+
 ## Status
 
 Skelettet kompilerer og alle fire providers er skrevet mod det verificerede

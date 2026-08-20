@@ -1,4 +1,4 @@
-import { ProfileInfo, type AbstractSession, type IProfAttrs } from '@zowe/imperative';
+import { ProfileInfo, type AbstractSession, type IProfArgAttrs, type IProfAttrs } from '@zowe/imperative';
 import type { ProfileDto } from '../shared/protocol';
 import { UserFacingError } from '../core/errors';
 
@@ -65,6 +65,7 @@ export class SessionManager {
     }
 
     const merged = info.mergeArgsForProfile(attrs, { getSecureVals: true });
+    assertHasCredentials(merged.knownArgs, attrs.profName);
     const session = ProfileInfo.createSession(merged.knownArgs);
     this.sessions.set(profileName, session);
     return session;
@@ -80,4 +81,34 @@ export class SessionManager {
       return undefined;
     }
   }
+}
+
+/**
+ * Turns a missing credential manager into a sentence the user can act on.
+ *
+ * Imperative loads `@zowe/secrets-for-zowe-sdk` with a runtime require() and,
+ * when it is absent, only logs "Failed to load Keytar module" before carrying
+ * on with every secure value silently empty. The connection then fails much
+ * later with an unrelated-looking 401, so the check happens here instead.
+ */
+function assertHasCredentials(args: IProfArgAttrs[], profileName: string): void {
+  const has = (name: string): boolean => {
+    const arg = args.find((a) => a.argName === name);
+    return arg?.argValue !== undefined && arg.argValue !== '';
+  };
+
+  const authenticated = (has('user') && has('password'))
+    || has('tokenValue')
+    || (has('certFile') && has('certKeyFile'));
+
+  if (authenticated) return;
+
+  throw new UserFacingError(
+    `Profilen '${profileName}' har ingen brugbare login-oplysninger.`,
+    'Enten mangler de i zowe.config.json, eller også kunne credential manageren '
+    + 'ikke læse dem. Det sidste viser sig som "Failed to load Keytar module" i '
+    + 'Debug Console og skyldes at @zowe/secrets-for-zowe-sdk ikke er installeret — '
+    + 'kør `npm install` igen. Tjek ellers `zowe config list --locations` og '
+    + '`zowe zosmf check status` fra en terminal.',
+  );
 }
