@@ -1,0 +1,130 @@
+{
+  "name": "mainframe-commander",
+  "displayName": "Mainframe Commander",
+  "description": "Total Commander-style dual-pane file manager for z/OS, powered by Zowe.",
+  "version": "0.1.0",
+  "publisher": "san",
+  "license": "EPL-2.0",
+  "repository": { "type": "git", "url": "https://github.com/san/mainframe-commander.git" },
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "keywords": ["mainframe", "zowe", "z/OS", "mvs", "uss", "jes", "commander"],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "mc.open", "title": "Mainframe Commander: Open", "icon": "$(split-horizontal)" },
+      { "command": "mc.key", "title": "Mainframe Commander: Forward key to panel" }
+    ],
+    "keybindings": [
+      { "command": "mc.open", "key": "ctrl+shift+m", "mac": "cmd+shift+m" },
+
+      { "command": "mc.key", "args": { "key": "F3" }, "key": "f3", "when": "activeWebviewPanelId == mainframeCommander" },
+      { "command": "mc.key", "args": { "key": "F4" }, "key": "f4", "when": "activeWebviewPanelId == mainframeCommander" },
+      { "command": "mc.key", "args": { "key": "F5" }, "key": "f5", "when": "activeWebviewPanelId == mainframeCommander" },
+      { "command": "mc.key", "args": { "key": "Shift+F5" }, "key": "shift+f5", "when": "activeWebviewPanelId == mainframeCommander" },
+      { "command": "mc.key", "args": { "key": "F6" }, "key": "f6", "when": "activeWebviewPanelId == mainframeCommander" },
+      { "command": "mc.key", "args": { "key": "F7" }, "key": "f7", "when": "activeWebviewPanelId == mainframeCommander" },
+      { "command": "mc.key", "args": { "key": "F8" }, "key": "f8", "when": "activeWebviewPanelId == mainframeCommander" },
+      { "command": "mc.key", "args": { "key": "F9" }, "key": "f9", "when": "activeWebviewPanelId == mainframeCommander" },
+      { "command": "mc.key", "args": { "key": "F10" }, "key": "f10", "when": "activeWebviewPanelId == mainframeCommander" },
+      { "command": "mc.key", "args": { "key": "F11" }, "key": "f11", "when": "activeWebviewPanelId == mainframeCommander" },
+      { "command": "mc.key", "args": { "key": "F12" }, "key": "f12", "when": "activeWebviewPanelId == mainframeCommander" }
+    ],
+    "configuration": {
+      "title": "Mainframe Commander",
+      "properties": {
+        "mc.panes.left": {
+          "type": "object",
+          "default": { "kind": "local", "profile": "", "path": "" },
+          "markdownDescription": "Location the left pane opens on. `kind` is one of `local`, `ds`, `uss`, `jes`.",
+          "properties": {
+            "kind": { "type": "string", "enum": ["local", "ds", "uss", "jes"] },
+            "profile": { "type": "string" },
+            "path": { "type": "string" }
+          }
+        },
+        "mc.panes.right": {
+          "type": "object",
+          "default": { "kind": "ds", "profile": "", "path": "" },
+          "markdownDescription": "Location the right pane opens on. An empty `profile` means the default Zowe profile."
+        },
+        "mc.transfer.defaultMode": {
+          "type": "string",
+          "enum": ["text", "binary", "auto"],
+          "default": "auto",
+          "markdownDescription": "Default transfer mode for F5. `auto` picks binary for the extensions in `#mc.transfer.binaryExtensions#` and text for everything else."
+        },
+        "mc.transfer.binaryExtensions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [".gz", ".zip", ".tar", ".jar", ".war", ".png", ".jpg", ".gif", ".pdf", ".class", ".so", ".bin"],
+          "description": "Extensions treated as binary when the transfer mode is 'auto'."
+        },
+        "mc.transfer.codepage": {
+          "type": "string",
+          "default": "IBM-1140",
+          "description": "EBCDIC codepage used for text transfers when the target does not declare one."
+        },
+        "mc.transfer.longLines": {
+          "type": "string",
+          "enum": ["wrap", "truncate", "abort"],
+          "default": "abort",
+          "markdownDescription": "What to do when a text line is longer than the target LRECL. `abort` is the safe default — silent truncation corrupts JCL."
+        },
+        "mc.transfer.skipDialog": {
+          "type": "boolean",
+          "default": false,
+          "description": "Start transfers straight away using the defaults above. Shift+F5 always skips the dialog."
+        },
+        "mc.transfer.concurrency": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "How many transfers run at the same time."
+        },
+        "mc.confirmDelete": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask before deleting (F8)."
+        },
+        "mc.list.pageSize": {
+          "type": "number",
+          "default": 1000,
+          "description": "Maximum entries fetched per listing before the pane reports a truncated view."
+        },
+        "mc.jes.autoRefreshSeconds": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "description": "How often a JES pane refreshes itself. 0 disables auto-refresh."
+        },
+        "mc.jes.owner": {
+          "type": "string",
+          "default": "",
+          "description": "Default owner filter for JES panes. Empty means the session user."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "package": "node esbuild.mjs --production",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p webview/tsconfig.json",
+    "vscode:prepublish": "npm run typecheck && npm run package"
+  },
+  "dependencies": {
+    "@zowe/core-for-zowe-sdk": "^8.0.0",
+    "@zowe/imperative": "^8.0.0",
+    "@zowe/zos-files-for-zowe-sdk": "^8.0.0",
+    "@zowe/zos-jobs-for-zowe-sdk": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.6.0"
+  }
+}
