@@ -14,6 +14,7 @@ export const settings = {
   confirmDelete: (): boolean => settings.get('confirmDelete', true),
   skipDialog: (): boolean => settings.get('transfer.skipDialog', false),
   jesOwner: (): string => settings.get('jes.owner', ''),
+  dsDefaultFilter: (): string => settings.get('ds.defaultFilter', ''),
   jesRefreshSeconds: (): number => settings.get('jes.autoRefreshSeconds', 10),
 
   transferDefaults: (): TransferOptions => ({

@@ -77,6 +77,27 @@ særtilfælde, men bare `source.read()` efterfulgt af `target.write()`.
   managers med dynamiske `require()`, som en bundler ikke kan følge. De er
   markeret `external` i `esbuild.mjs` og ligger i `node_modules`.
 
+## Fejlfinding
+
+### LMDINIT-fejl når DS-panelet åbner
+
+`X-IBM-Attributes: base` — som er det `List.dataSet(..., { attributes: true })`
+sender — får z/OSMF til at gå gennem TSO's og ISPF's datasetliste-services i
+stedet for bare at læse kataloget. De services fejler på ting et katalogopslag
+klarer uden problemer: et migreret datasæt som DFSMShsm vil spørge om,
+en volume der ikke er mounted, eller et filter der rammer for bredt. Symptomet
+er en LMDINIT-fejl eller *"received TSO Prompt when expecting
+TsoServletResponse"*.
+
+To ting er ændret som følge af det:
+
+- Et tomt panel-filter bliver ikke længere til `dslevel=*` (hele kataloget), men
+  til `<DIN-BRUGER>.*`. Sæt `mc.ds.defaultFilter` hvis du vil noget andet.
+- `listWithAttributeFallback()` prøver den detaljerede visning først og falder
+  tilbage til en ren navneliste hvis den fejler. Panelet viser da
+  `uden attributter` i footeren i stedet for at være tomt. Kolonnerne RECFM,
+  LRECL og Used står tomme i det tilfælde — resten virker.
+
 ## Om credential manageren
 
 `@zowe/imperative` læser secure-værdier fra zowe.config.json via

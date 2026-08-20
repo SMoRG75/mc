@@ -100,6 +100,11 @@
           "minimum": 0,
           "description": "How often a JES pane refreshes itself. 0 disables auto-refresh."
         },
+        "mc.ds.defaultFilter": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Datasetfilter et DS-panel åbner på når stien er tom. Tomt betyder `<DIN-BRUGER>.*`. Undgå et bart `*` — det beder z/OSMF om at gennemgå hele kataloget og fejler typisk i TSO's listeservices (LMDINIT)."
+        },
         "mc.jes.owner": {
           "type": "string",
           "default": "",

@@ -17,6 +17,7 @@ export function activate(context: vscode.ExtensionContext): void {
   providers.register(new DsProvider(sessions, {
     pageSize: settings.pageSize,
     binaryExtensions: settings.binaryExtensions,
+    defaultFilter: settings.dsDefaultFilter,
   }));
   providers.register(new UssProvider(sessions, {
     pageSize: settings.pageSize,

@@ -1,14 +1,17 @@
 import { Create, CreateDataSetTypeEnum, Delete, Get, List, Rename, Upload } from '@zowe/zos-files-for-zowe-sdk';
+import type { IZosFilesResponse } from '@zowe/zos-files-for-zowe-sdk';
 import type { AbstractSession } from '@zowe/imperative';
 import type { Capabilities, ColumnDef, PaneLocation, TransferOptions } from '../shared/protocol';
 import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
 import type { SessionManager } from '../zowe/sessions';
-import { UserFacingError } from '../core/errors';
+import { describeError, UserFacingError } from '../core/errors';
 import { fitToRecordLength, resolveMode } from '../core/text';
 
 export interface DsSettings {
   pageSize: () => number;
   binaryExtensions: () => readonly string[];
+  /** Overrides the derived `<USER>.*` filter when the pane path is empty. */
+  defaultFilter: () => string;
 }
 
 /** A pane on MVS datasets: a filter listing at the top level, members inside a PDS. */
@@ -53,12 +56,27 @@ export class DsProvider implements PaneProvider {
     const session = await this.sessions.session(loc.profile);
     signal.throwIfAborted();
     return isFilter(loc.path)
-      ? this.listDataSets(session, loc.path || '*', signal)
+      ? this.listDataSets(session, loc.path || this.defaultFilter(session), signal)
       : this.listMembers(session, loc.path, signal);
   }
 
+  /**
+   * An empty pane path must not become `dslevel=*`.
+   *
+   * A bare `*` asks z/OSMF to walk the entire catalog, which is slow at best
+   * and on most systems fails outright in the TSO data set list services
+   * (LMDINIT). The user's own high-level qualifier is both the safe default and
+   * what they almost always wanted.
+   */
+  private defaultFilter(session: AbstractSession): string {
+    const configured = this.settings.defaultFilter().trim();
+    if (configured) return configured;
+    const user = (session.ISession?.user ?? '').trim();
+    return user ? `${user.toUpperCase()}.*` : '*';
+  }
+
   private async listDataSets(session: AbstractSession, filter: string, signal: AbortSignal): Promise<Listing> {
-    const response = await List.dataSet(session, filter, { attributes: true });
+    const { response, withAttributes } = await this.listWithAttributeFallback(session, filter);
     signal.throwIfAborted();
     const items = (response.apiResponse?.items ?? []) as ZosmfDataSet[];
     const limit = this.settings.pageSize();
@@ -91,9 +109,39 @@ export class DsProvider implements PaneProvider {
       title: filter,
       columns: DATASET_COLUMNS,
       entries,
-      status: `${items.length} datasæt`,
+      status: withAttributes
+        ? `${items.length} datasæt`
+        : `${items.length} datasæt · uden attributter`,
       truncated: items.length > limit,
     };
+  }
+
+  /**
+   * Lists with `X-IBM-Attributes: base` and falls back to a plain catalog list.
+   *
+   * Asking for attributes makes z/OSMF go through the TSO/ISPF data set list
+   * services, which blow up on things a plain catalog read handles fine: a
+   * migrated data set that DFSMShsm wants to prompt about, a volume that is not
+   * mounted, a filter that matches too much. The symptom is an LMDINIT failure
+   * or "received TSO Prompt when expecting TsoServletResponse" — never
+   * something the user can act on.
+   *
+   * So: try the rich listing, and if anything at all goes wrong, get the names
+   * without attributes rather than showing an empty pane. The original error is
+   * re-thrown only if the plain listing fails too, since that one is real.
+   */
+  private async listWithAttributeFallback(
+    session: AbstractSession, filter: string,
+  ): Promise<{ response: IZosFilesResponse; withAttributes: boolean }> {
+    try {
+      return { response: await List.dataSet(session, filter, { attributes: true }), withAttributes: true };
+    } catch (rich) {
+      try {
+        return { response: await List.dataSet(session, filter, {}), withAttributes: false };
+      } catch {
+        throw explainListFailure(rich, filter);
+      }
+    }
   }
 
   private async listMembers(session: AbstractSession, dsname: string, signal: AbortSignal): Promise<Listing> {
@@ -252,6 +300,27 @@ export class DsProvider implements PaneProvider {
     const response = await List.dataSet(session, dsname, { attributes: true });
     return ((response.apiResponse?.items ?? []) as ZosmfDataSet[])[0];
   }
+}
+
+/**
+ * z/OSMF reports these failures in terms of the TSO services it happens to use
+ * internally, which tells the user nothing. Name the two things that actually
+ * fix it.
+ */
+function explainListFailure(err: unknown, filter: string): UserFacingError {
+  const { message, detail } = describeError(err);
+  const haystack = `${message}\n${detail ?? ''}`;
+
+  if (!/LMDINIT|LMDLIST|ISPF|TSO Prompt|IKJ566/i.test(haystack)) {
+    return new UserFacingError(`Kunne ikke liste '${filter}'.`, `${message}\n${detail ?? ''}`.trim());
+  }
+  return new UserFacingError(
+    `z/OSMF kunne ikke liste '${filter}'.`,
+    'Filteret rammer sandsynligvis for bredt, eller resultatet indeholder '
+    + 'migrerede datasæt som DFSMShsm vil spørge om. Prøv et snævrere filter, '
+    + "eller sæt et fast udgangspunkt i indstillingen 'mc.ds.defaultFilter'.\n\n"
+    + `${message}\n${detail ?? ''}`.trim(),
+  );
 }
 
 /** A path with a wildcard (or empty) is a filter; anything else names one dataset. */
