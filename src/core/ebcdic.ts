@@ -97,6 +97,32 @@ function tableFor(codepage: string): string {
   return table;
 }
 
+/**
+ * Whether these bytes are already text, and so have no EBCDIC left in them.
+ *
+ * Worth a check because the failure is silent otherwise: ASCII decoded as
+ * EBCDIC comes out as page after page of accented letters that look for all the
+ * world like a wrong codepage rather than like the wrong question. 'Licensed
+ * Materials' arrives as '<ÑÄÁ>ËÁÀ (/ÈÁÊÑ/%Ë', and nothing on screen says the
+ * bytes were never EBCDIC to begin with.
+ *
+ * The tell is the letters. EBCDIC puts them at x'81' and above, so any real
+ * EBCDIC text is mostly high bytes; text that is instead a fifth ASCII letters
+ * with nothing above x'7F' is ASCII, whatever it was expected to be. USS files
+ * are the usual case — a file tagged ISO8859-1 or UTF-8 is stored as it reads,
+ * and z/OSMF's own `.properties` files are exactly that.
+ */
+export function looksLikeText(bytes: Uint8Array): boolean {
+  if (bytes.length < 16) return false;
+  let high = 0;
+  let letters = 0;
+  for (const byte of bytes) {
+    if (byte >= 0x80) high += 1;
+    else if ((byte >= 0x41 && byte <= 0x5a) || (byte >= 0x61 && byte <= 0x7a)) letters += 1;
+  }
+  return high / bytes.length < 0.05 && letters / bytes.length > 0.2;
+}
+
 export function decodeEbcdic(bytes: Uint8Array, codepage: string): string {
   const table = tableFor(codepage);
   let out = '';
@@ -120,6 +146,18 @@ export function ebcdicToText(
   bytes: Uint8Array, codepage: string, recordLength: number,
 ): string {
   const table = tableFor(codepage);
+  if (looksLikeText(bytes)) {
+    throw new UserFacingError(
+      'These bytes are not EBCDIC — they are already text.',
+      'Nothing here is above x\'7F\' and a fifth of it is ASCII letters, so there is '
+      + `no EBCDIC left to decode; reading it as ${codepage} would only produce `
+      + 'convincing-looking nonsense.\n\n'
+      + 'F3 shows this file correctly. A USS file tagged ISO8859-1 or UTF-8 is stored '
+      + "the way it reads — z/OSMF's own .properties files are — and F3 follows the tag.\n\n"
+      + 'Shift+F3 is for content no service will convert: a load module, a data set read '
+      + 'in binary, or an EBCDIC file that came down to the PC untranslated.',
+    );
+  }
   const separated = bytes.some((byte) => byte === NL || byte === LF);
   const records: string[] = [];
 

@@ -95,7 +95,11 @@ special case, just `source.read()` followed by `target.write()`.
   (`mc.view.ebcdicRecordLength` when there is none). The page is
   `mc.view.ebcdicCodepage`, falling back to the transfer codepage, and it is in
   the tab title — the same bytes are equally valid as IBM-037 and as IBM-277,
-  so which one you chose is part of what you are looking at.
+  so which one you chose is part of what you are looking at. Content that is
+  already text is refused rather than decoded: ASCII read as EBCDIC comes out as
+  pages of accented letters that look like a wrong codepage rather than like the
+  wrong question, and a USS file tagged ISO8859-1 — z/OSMF's own `.properties`
+  files are — has no EBCDIC in it at all.
 - **`longLines: 'abort'` by default.** A 132-character line going into FB 80 is
   the classic way to ruin an upload. The user has to choose wrap or truncate
   deliberately.
