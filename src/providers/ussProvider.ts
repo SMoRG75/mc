@@ -87,6 +87,16 @@ export class UssProvider implements PaneProvider {
     return ref.isDirectory ? { ...loc, path: ref.path } : undefined;
   }
 
+  /** `cd /u`, `cd u`, `cd ../tmp` and a bare `cd` for the root. */
+  resolve(loc: PaneLocation, argument: string): PaneLocation {
+    const target = argument.trim();
+    if (!target) return { ...loc, path: '/' };
+    return {
+      ...loc,
+      path: normalize(target.startsWith('/') ? target : join(loc.path || '/', target)),
+    };
+  }
+
   describe(_loc: PaneLocation, entry: Entry): SourceItem {
     const ref = entry.ref as UssRef;
     return { name: basename(ref.path), size: entry.dto.size, text: false };
@@ -149,6 +159,17 @@ export class UssProvider implements PaneProvider {
 
 function join(dir: string, name: string): string {
   return `${dir.replace(/\/$/, '')}/${name}`;
+}
+
+/** Resolves `.` and `..` and collapses repeated slashes; always absolute. */
+function normalize(path: string): string {
+  const parts: string[] = [];
+  for (const segment of path.split('/')) {
+    if (!segment || segment === '.') continue;
+    if (segment === '..') parts.pop();
+    else parts.push(segment);
+  }
+  return `/${parts.join('/')}`;
 }
 
 function dirname(path: string): string {

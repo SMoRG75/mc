@@ -352,10 +352,15 @@ export class CommanderPanel {
     switch ((verb ?? '').toLowerCase()) {
       case '':
         return;
-      case 'cd':
-        this.panes[pane].location = { ...this.panes[pane].location, path: argument };
+      case 'cd': {
+        const provider = this.provider(pane);
+        const from = this.panes[pane].location;
+        this.panes[pane].location = provider.resolve
+          ? provider.resolve(from, argument)
+          : { ...from, path: argument };
         await this.refresh(pane);
         return;
+      }
       case 'submit': {
         const entry = this.panes[pane].entries.find(
           (e) => e.dto.name.toUpperCase() === argument.toUpperCase(),

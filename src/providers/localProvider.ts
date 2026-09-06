@@ -82,6 +82,13 @@ export class LocalProvider implements PaneProvider {
     return ref.isDirectory ? { ...loc, path: ref.fullPath } : undefined;
   }
 
+  /** `path.resolve` already knows about drive letters, UNC paths and `..`. */
+  resolve(loc: PaneLocation, argument: string): PaneLocation {
+    const target = argument.trim();
+    if (!target) return loc;
+    return { ...loc, path: path.resolve(loc.path || process.cwd(), target) };
+  }
+
   describe(_loc: PaneLocation, entry: Entry): SourceItem {
     const ref = entry.ref as LocalRef;
     return { name: path.basename(ref.fullPath), size: entry.dto.size, text: false };

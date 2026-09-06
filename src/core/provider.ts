@@ -55,6 +55,15 @@ export interface PaneProvider {
   parent(loc: PaneLocation): PaneLocation | undefined;
 
   /**
+   * Where `cd <argument>` from the command line lands.
+   *
+   * Only the provider knows whether its paths nest: USS and local disk join a
+   * relative name onto the current directory, while a dataset filter or a JES
+   * job filter is always absolute. Left out, `cd` replaces the path verbatim.
+   */
+  resolve?(loc: PaneLocation, argument: string): PaneLocation;
+
+  /**
    * Where Enter on this entry leads. `undefined` means the entry is a leaf and
    * should be opened in an editor instead of navigated into.
    */
