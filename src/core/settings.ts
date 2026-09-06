@@ -10,9 +10,15 @@ import type { PaneId, PaneKind, PaneLocation, TransferOptions } from '../shared/
  * would shadow the setting for ever, and editing `mc.panes.left` would look
  * like it did nothing.
  */
+export interface RememberedPane {
+  location: PaneLocation;
+  /** Entry id the cursor was on, when there was one worth coming back to. */
+  cursor?: string;
+}
+
 export interface RememberedPanes {
-  left: PaneLocation;
-  right: PaneLocation;
+  left: RememberedPane;
+  right: RememberedPane;
   from: { left: PaneLocation; right: PaneLocation };
 }
 
@@ -97,7 +103,7 @@ export const settings = {
   startLocation: (pane: PaneId, remembered?: RememberedPanes): PaneLocation => {
     const configured = settings.configuredStartLocation(pane);
     if (!remembered) return configured;
-    return sameLocation(remembered.from[pane], configured) ? remembered[pane] : configured;
+    return sameLocation(remembered.from[pane], configured) ? remembered[pane].location : configured;
   },
 };
 
@@ -124,12 +130,19 @@ function asLocation(value: unknown): PaneLocation | undefined {
  */
 export function asRememberedPanes(value: unknown): RememberedPanes | undefined {
   const raw = value as { left?: unknown; right?: unknown; from?: { left?: unknown; right?: unknown } };
-  const left = asLocation(raw?.left);
-  const right = asLocation(raw?.right);
+  const left = asPane(raw?.left);
+  const right = asPane(raw?.right);
   const fromLeft = asLocation(raw?.from?.left);
   const fromRight = asLocation(raw?.from?.right);
   if (!left || !right || !fromLeft || !fromRight) return undefined;
   return { left, right, from: { left: fromLeft, right: fromRight } };
+}
+
+function asPane(value: unknown): RememberedPane | undefined {
+  const raw = value as { location?: unknown; cursor?: unknown } | undefined;
+  const location = asLocation(raw?.location);
+  if (!location) return undefined;
+  return { location, cursor: typeof raw?.cursor === 'string' ? raw.cursor : undefined };
 }
 
 /**

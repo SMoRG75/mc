@@ -32,6 +32,7 @@ export class Pane {
       activate: (entry: EntryDto) => void;
       focus: (pane: PaneId) => void;
       navigate: (location: PaneLocation) => void;
+      cursorMoved: (pane: PaneId, entryId: string) => void;
     },
   ) {
     this.element.className = 'pane';
@@ -40,6 +41,10 @@ export class Pane {
     this.list = new VirtualList(
       (entry) => this.callbacks.activate(entry),
       () => this.callbacks.focus(this.id),
+      (index) => {
+        const entry = this.view[index];
+        if (entry) this.callbacks.cursorMoved(this.id, entry.id);
+      },
     );
 
     this.header.className = 'pane-head';
@@ -152,8 +157,16 @@ export class Pane {
     }));
 
     this.applyFilter();
-    // Refreshing in place should not throw away where the user was reading.
-    if (movedElsewhere) this.list.setCursor(0);
+    if (listing.cursor !== undefined) {
+      // A position carried over from the last session. The row may well be gone
+      // — a member deleted, a job purged — and the top of the list is then the
+      // only honest answer.
+      const index = this.view.findIndex((entry) => entry.id === listing.cursor);
+      this.list.setCursor(index < 0 ? 0 : index);
+    } else if (movedElsewhere) {
+      // Refreshing in place should not throw away where the user was reading.
+      this.list.setCursor(0);
+    }
     this.updateFooter();
   }
 

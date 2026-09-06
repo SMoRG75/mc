@@ -77,6 +77,12 @@ export interface ListingDto {
   capabilities: Capabilities;
   /** Empty for providers that only have one way of looking at a location. */
   views?: ViewDto[];
+  /**
+   * Entry id to put the cursor on, sent only when a remembered position is being
+   * restored. Absent on every other listing, so the pane keeps deciding for
+   * itself where the cursor goes.
+   */
+  cursor?: string;
 }
 
 export interface Capabilities {
@@ -185,5 +191,7 @@ export type ClientMessage =
   | { type: 'create'; pane: PaneId; name: string; dataset?: DatasetSpec }
   | { type: 'submit'; pane: PaneId; entryIds: string[] }
   | { type: 'compare'; leftEntryId: string; rightEntryId: string }
+  /** Which row the cursor is on, so the next session can start there. Debounced. */
+  | { type: 'cursor'; pane: PaneId; entryId: string }
   | { type: 'cancelTransfer'; id: string }
   | { type: 'commandLine'; pane: PaneId; line: string };

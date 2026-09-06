@@ -6,7 +6,7 @@ import type { Entry, PaneProvider, ProviderRegistry } from './core/provider';
 import { TransferQueue, type TransferRequest } from './core/transferQueue';
 import { EditorBridge, type OpenMode } from './core/editorBridge';
 import { describeError, UserFacingError } from './core/errors';
-import { asRememberedPanes, settings, type RememberedPanes } from './core/settings';
+import { asRememberedPanes, sameLocation, settings, type RememberedPanes } from './core/settings';
 import type { SessionManager } from './zowe/sessions';
 
 const VIEW_TYPE = 'mainframeCommander';
@@ -23,6 +23,14 @@ const REMEMBERED_PANES = 'panes.last';
 interface PaneState {
   location: PaneLocation;
   entries: Entry[];
+  /** The row the cursor is on, as the webview last reported it. */
+  cursor?: string;
+  /**
+   * A remembered cursor waiting to be handed back, cleared once it has been.
+   * Only the first listing carries one: after that the pane owns its own cursor
+   * and a second opinion from here would fight with it.
+   */
+  restore?: string;
   /** Cancels the in-flight listing when the user navigates away from it. */
   inFlight?: AbortController;
 }
@@ -81,10 +89,16 @@ export class CommanderPanel {
     private readonly sessions: SessionManager,
   ) {
     const remembered = asRememberedPanes(context.globalState.get(REMEMBERED_PANES));
-    this.panes = {
-      left: { location: settings.startLocation('left', remembered), entries: [] },
-      right: { location: settings.startLocation('right', remembered), entries: [] },
+    const restore = (pane: PaneId): PaneState => {
+      const location = settings.startLocation(pane, remembered);
+      // A cursor is only meaningful in the listing it was remembered in. When
+      // the location came from mc.panes.* instead, the remembered row is
+      // somewhere else entirely and starting on it would be nonsense.
+      const saved = remembered?.[pane];
+      const cursor = saved && sameLocation(saved.location, location) ? saved.cursor : undefined;
+      return { location, entries: [], cursor, restore: cursor };
     };
+    this.panes = { left: restore('left'), right: restore('right') };
 
     this.queue = new TransferQueue(
       settings.concurrency,
@@ -208,6 +222,11 @@ export class CommanderPanel {
           await this.compare(msg.leftEntryId, msg.rightEntryId);
           break;
 
+        case 'cursor':
+          this.panes[msg.pane].cursor = msg.entryId;
+          this.rememberPanes();
+          break;
+
         case 'cancelTransfer':
           this.queue.cancel(msg.id);
           break;
@@ -250,8 +269,10 @@ export class CommanderPanel {
           truncated: listing.truncated,
           capabilities: provider.capabilities(state.location),
           views: listing.views,
+          cursor: state.restore,
         },
       });
+      state.restore = undefined;
       this.rememberPanes();
     } catch (err) {
       if (controller.signal.aborted) return;
@@ -273,8 +294,8 @@ export class CommanderPanel {
    */
   private rememberPanes(): void {
     const state: RememberedPanes = {
-      left: this.panes.left.location,
-      right: this.panes.right.location,
+      left: { location: this.panes.left.location, cursor: this.panes.left.cursor },
+      right: { location: this.panes.right.location, cursor: this.panes.right.cursor },
       from: {
         left: settings.configuredStartLocation('left'),
         right: settings.configuredStartLocation('right'),

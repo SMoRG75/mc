@@ -25,6 +25,8 @@ export class VirtualList {
   constructor(
     private readonly onActivate: (entry: EntryDto) => void,
     private readonly onCursor: (index: number) => void,
+    /** Every landing place of the cursor, however it got there. */
+    private readonly onCursorMoved: (index: number) => void = () => undefined,
   ) {
     this.viewport.className = 'rows-viewport';
     // Focusable, but not in the tab order: the panes are driven by the keymap,
@@ -42,9 +44,10 @@ export class VirtualList {
     this.viewport.addEventListener('mousedown', (event) => {
       const index = this.indexFromEvent(event);
       if (index !== undefined) {
-        this.cursor = index;
+        // Through setCursor rather than around it, so a click is reported like
+        // any other cursor move.
+        this.setCursor(index);
         this.onCursor(index);
-        this.paint();
       }
     });
   }
@@ -75,6 +78,7 @@ export class VirtualList {
     this.cursor = Math.max(0, Math.min(index, this.entries.length - 1));
     this.scrollIntoView();
     this.paint();
+    this.onCursorMoved(this.cursor);
   }
 
   get cursorIndex(): number {

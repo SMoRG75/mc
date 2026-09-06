@@ -24,6 +24,8 @@ class App {
   private profiles: ProfileDto[] = [];
   private filterMode = false;
   private filterText = '';
+  private pendingCursor: Partial<Record<PaneId, string>> = {};
+  private cursorTimer = 0;
 
   private readonly commandInput = document.createElement('input');
   private readonly promptLabel = document.createElement('span');
@@ -70,7 +72,26 @@ class App {
       },
       focus: (pane) => this.setActive(pane),
       navigate: (location: PaneLocation) => send({ type: 'navigate', pane: id, location }),
+      cursorMoved: (pane, entryId) => this.rememberCursor(pane, entryId),
     });
+  }
+
+  /**
+   * Tells the host where the cursor is, so the next session starts there.
+   *
+   * Held back briefly because the cursor moves on every arrow key: someone
+   * paging through a PDS with twenty thousand members would otherwise send a
+   * message per keypress, and only the last one is worth anything.
+   */
+  private rememberCursor(pane: PaneId, entryId: string): void {
+    this.pendingCursor[pane] = entryId;
+    window.clearTimeout(this.cursorTimer);
+    this.cursorTimer = window.setTimeout(() => {
+      for (const [target, id] of Object.entries(this.pendingCursor)) {
+        send({ type: 'cursor', pane: target as PaneId, entryId: id });
+      }
+      this.pendingCursor = {};
+    }, 400);
   }
 
   private commandLine(): HTMLElement {
