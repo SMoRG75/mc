@@ -44,8 +44,8 @@ export function fitToRecordLength(
         break;
       case 'abort':
         throw new UserFacingError(
-          `Linje ${index + 1} er ${line.length} tegn, men destinationen har LRECL ${lrecl}.`,
-          'Vælg Ombryd eller Afkort i overførselsdialogen, eller allokér datasættet med en større LRECL.',
+          `Line ${index + 1} is ${line.length} characters, but the destination has LRECL ${lrecl}.`,
+          'Choose Wrap or Truncate in the transfer dialog, or allocate the dataset with a larger LRECL.',
         );
     }
   }

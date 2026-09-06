@@ -58,9 +58,9 @@ export class SessionManager {
     if (!attrs) {
       throw new UserFacingError(
         profileName
-          ? `Zowe-profilen '${profileName}' findes ikke.`
-          : 'Der er ingen default zosmf-profil.',
-        'Kør `zowe config init` eller vælg en anden profil i panelets profilvælger.',
+          ? `The Zowe profile '${profileName}' does not exist.`
+          : 'There is no default zosmf profile.',
+        'Run `zowe config init`, or pick another profile in the pane\'s profile selector.',
       );
     }
 
@@ -104,11 +104,11 @@ function assertHasCredentials(args: IProfArgAttrs[], profileName: string): void 
   if (authenticated) return;
 
   throw new UserFacingError(
-    `Profilen '${profileName}' har ingen brugbare login-oplysninger.`,
-    'Enten mangler de i zowe.config.json, eller også kunne credential manageren '
-    + 'ikke læse dem. Det sidste viser sig som "Failed to load Keytar module" i '
-    + 'Debug Console og skyldes at @zowe/secrets-for-zowe-sdk ikke er installeret — '
-    + 'kør `npm install` igen. Tjek ellers `zowe config list --locations` og '
-    + '`zowe zosmf check status` fra en terminal.',
+    `The profile '${profileName}' has no usable credentials.`,
+    'Either they are missing from zowe.config.json, or the credential manager '
+    + 'could not read them. The latter shows up as "Failed to load Keytar module" in '
+    + 'the Debug Console and means @zowe/secrets-for-zowe-sdk is not installed — '
+    + 'run `npm install` again. Otherwise check `zowe config list --locations` and '
+    + '`zowe zosmf check status` from a terminal.',
   );
 }

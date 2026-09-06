@@ -25,7 +25,7 @@ export function describeError(err: unknown): { message: string; detail?: string 
   if (typeof err === 'object' && err !== null) {
     const e = err as ImperativeLike;
     const cause = parseCause(e.mDetails?.causeErrors);
-    const message = cause?.message ?? e.mDetails?.msg ?? e.message ?? 'Ukendt fejl';
+    const message = cause?.message ?? e.mDetails?.msg ?? e.message ?? 'Unknown error';
     const detail = [
       e.errorCode !== undefined ? `Status ${e.errorCode}` : undefined,
       cause?.reason,

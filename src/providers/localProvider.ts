@@ -20,7 +20,7 @@ export class LocalProvider implements PaneProvider {
   constructor(private readonly pageSize: () => number) {}
 
   label(): string {
-    return 'Denne PC';
+    return 'This PC';
   }
 
   capabilities(): Capabilities {
@@ -67,7 +67,7 @@ export class LocalProvider implements PaneProvider {
       title: dir,
       columns: COLUMNS,
       entries,
-      status: `${formatBytes(bytes)} i katalog`,
+      status: `${formatBytes(bytes)} in folder`,
       truncated: dirents.length > limit,
     };
   }
@@ -126,7 +126,7 @@ export class LocalProvider implements PaneProvider {
 
 function formatBytes(bytes: number | undefined): string {
   if (bytes === undefined) return '';
-  return bytes.toLocaleString('da-DK');
+  return bytes.toLocaleString('en-US');
 }
 
 function formatDate(date: Date | undefined): string {

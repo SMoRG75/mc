@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="da">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mainframe Commander — idéskitse</title>
+<title>Mainframe Commander — design sketch</title>
 <style>
   :root{
     --bg:#1e1e1e; --bg2:#252526; --bg3:#2d2d30; --line:#3c3c3c;
@@ -141,12 +141,12 @@
 <div class="wrap">
 
   <h1>Mainframe Commander</h1>
-  <p class="sub">Idéskitse — Total Commander-agtig dual-pane til z/OS i VS Code, drevet af Zowe.</p>
+  <p class="sub">Design sketch — Total Commander-style dual pane for z/OS in VS Code, powered by Zowe.</p>
 
-  <h2>1 · Hovedbilledet <span>editor-webview, fuld bredde</span></h2>
-  <p class="note">Venstre panel: PDS-medlemmer på LPAR1. Højre panel: USS-katalog på LPAR2.
-     Markerede filer står gule som i Total Commander. F5 kopierer fra det aktive panel til det andet —
-     også på tværs af Zowe-profiler.</p>
+  <h2>1 · The main view <span>editor webview, full width</span></h2>
+  <p class="note">Left pane: PDS members on LPAR1. Right pane: USS directory on LPAR2.
+     Selected files are yellow as in Total Commander. F5 copies from the active pane to the other one —
+     across Zowe profiles as well.</p>
 
   <div class="vscode">
     <div class="titlebar">
@@ -188,7 +188,7 @@
                 <th style="width:24%">Changed</th><th style="width:12%" class="num">Size</th><th style="width:12%">ID</th>
               </tr></thead>
               <tbody>
-                <tr><td class="up"><span class="ico">↰</span>..</td><td colspan="4" class="dim">&lt;OP-NIVEAU&gt;</td></tr>
+                <tr><td class="up"><span class="ico">↰</span>..</td><td colspan="4" class="dim">&lt;UP ONE LEVEL&gt;</td></tr>
                 <tr><td><span class="ico">🗎</span>ALLOCDB</td><td class="dim">01.04</td><td class="dim">2026/07/02 09:11</td><td class="num dim">142</td><td class="dim">IBMUSER</td></tr>
                 <tr class="mark"><td><span class="ico">🗎</span>BACKUP01</td><td>02.11</td><td>2026/08/12 14:03</td><td class="num">3 208</td><td>SANJ</td></tr>
                 <tr class="mark sel"><td><span class="ico">🗎</span>BACKUP02</td><td>02.03</td><td>2026/08/12 14:07</td><td class="num">2 940</td><td>SANJ</td></tr>
@@ -201,7 +201,7 @@
               </tbody>
             </table>
             <div class="pane-foot">
-              <span>3 af 24 medlemmer markeret — 6 236 linjer</span>
+              <span>3 of 24 members selected — 6,236 lines</span>
               <span class="r">3390 · VOL=PRD001</span>
             </div>
           </div>
@@ -225,7 +225,7 @@
                 <th style="width:24%">Modified</th><th style="width:12%">Perm</th><th style="width:10%">Owner</th>
               </tr></thead>
               <tbody>
-                <tr><td class="up"><span class="ico">↰</span>..</td><td colspan="4" class="dim">&lt;OP-NIVEAU&gt;</td></tr>
+                <tr><td class="up"><span class="ico">↰</span>..</td><td colspan="4" class="dim">&lt;UP ONE LEVEL&gt;</td></tr>
                 <tr><td><span class="ico">📁</span>archive</td><td class="num dim">&lt;DIR&gt;</td><td class="dim">2026/08/11 22:00</td><td class="dim">drwxr-x---</td><td class="dim">sanj</td></tr>
                 <tr><td><span class="ico">📁</span>logs</td><td class="num dim">&lt;DIR&gt;</td><td class="dim">2026/08/20 06:30</td><td class="dim">drwxrwx---</td><td class="dim">sanj</td></tr>
                 <tr><td><span class="ico">🗎</span>build.sh</td><td class="num dim">2 112</td><td class="dim">2026/08/19 15:41</td><td class="dim">-rwxr-x---</td><td class="dim">sanj</td></tr>
@@ -237,8 +237,8 @@
               </tbody>
             </table>
             <div class="pane-foot">
-              <span class="r">0 af 8 markeret</span>
-              <span class="r">18,4 MB i katalog</span>
+              <span class="r">0 of 8 selected</span>
+              <span class="r">18.4 MB in directory</span>
             </div>
           </div>
         </div>
@@ -263,16 +263,16 @@
           <span>⇄ Zowe: LPAR1 ✓ · LPAR2 ✓</span>
           <span>z/OSMF 2.5</span>
           <span class="sp"></span>
-          <span>Kø: 2 overførsler</span>
+          <span>Queue: 2 transfers</span>
           <span>EBCDIC IBM-1140</span>
         </div>
       </div>
     </div>
   </div>
 
-  <h2>2 · Samme panel, JES-tilstand <span>jobkø som "filsystem"</span></h2>
-  <p class="note">Skift til JES i det samme panel: jobs bliver mapper, spool-DD'er bliver filer.
-     Så virker F3 (view), F5 (kopiér spool ud til USS eller lokalt) og F8 (purge) præcis som alle andre steder.</p>
+  <h2>2 · The same pane, JES mode <span>the job queue as a "file system"</span></h2>
+  <p class="note">Switch to JES in the same pane: jobs become folders, spool DDs become files.
+     F3 (view), F5 (copy spool out to USS or locally) and F8 (purge) then work exactly as everywhere else.</p>
 
   <div class="vscode">
     <div class="body" style="min-height:0">
@@ -291,14 +291,14 @@
                 <th style="width:12%" class="num">RC</th><th style="width:28%">Submitted</th>
               </tr></thead>
               <tbody>
-                <tr><td class="up"><span class="ico">↰</span>..</td><td colspan="4" class="dim">&lt;ALLE EJERE&gt;</td></tr>
+                <tr><td class="up"><span class="ico">↰</span>..</td><td colspan="4" class="dim">&lt;ALL OWNERS&gt;</td></tr>
                 <tr class="sel"><td><span class="ico">📁</span>SANJBKUP</td><td>JOB04412</td><td style="color:#89d185">OUTPUT</td><td class="num" style="color:#89d185">CC 0000</td><td>2026/08/20 07:11</td></tr>
                 <tr><td><span class="ico">📁</span>SANJLOAD</td><td class="dim">JOB04409</td><td class="dim" style="color:#4fc1ff">ACTIVE</td><td class="num dim">—</td><td class="dim">2026/08/20 07:04</td></tr>
                 <tr><td><span class="ico">📁</span>NIGHTRUN</td><td class="dim">JOB04388</td><td class="dim" style="color:#f14c4c">OUTPUT</td><td class="num dim" style="color:#f14c4c">ABEND S806</td><td class="dim">2026/08/19 23:58</td></tr>
                 <tr><td><span class="ico">📁</span>SANJCOMP</td><td class="dim">JOB04370</td><td class="dim" style="color:#e5c07b">OUTPUT</td><td class="num dim" style="color:#e5c07b">CC 0004</td><td class="dim">2026/08/19 15:42</td></tr>
               </tbody>
             </table>
-            <div class="pane-foot"><span>1 af 4 jobs</span><span class="r">auto-refresh 10 s</span></div>
+            <div class="pane-foot"><span>1 of 4 jobs</span><span class="r">auto-refresh 10 s</span></div>
           </div>
 
           <div class="pane inactive">
@@ -314,7 +314,7 @@
                 <th style="width:22%">Stepname</th><th style="width:20%" class="num">Records</th><th style="width:22%">Class</th>
               </tr></thead>
               <tbody>
-                <tr><td class="up" colspan="2"><span class="ico">↰</span>..</td><td colspan="3" class="dim">&lt;JOBLISTE&gt;</td></tr>
+                <tr><td class="up" colspan="2"><span class="ico">↰</span>..</td><td colspan="3" class="dim">&lt;JOB LIST&gt;</td></tr>
                 <tr><td class="num dim">2</td><td class="dim">JESMSGLG</td><td class="dim">JES2</td><td class="num dim">28</td><td class="dim">A</td></tr>
                 <tr><td class="num dim">3</td><td class="dim">JESJCL</td><td class="dim">JES2</td><td class="num dim">41</td><td class="dim">A</td></tr>
                 <tr class="sel"><td class="num">4</td><td>JESYSMSG</td><td>JES2</td><td class="num">116</td><td>A</td></tr>
@@ -322,12 +322,12 @@
                 <tr><td class="num dim">103</td><td class="dim">SYSOUT</td><td class="dim">BACKSTEP</td><td class="num dim">61</td><td class="dim">A</td></tr>
               </tbody>
             </table>
-            <div class="pane-foot"><span>1 markeret — 4 902 linjer</span><span class="r">F5 → gem i /u/sanj/logs</span></div>
+            <div class="pane-foot"><span>1 selected — 4,902 lines</span><span class="r">F5 → save in /u/sanj/logs</span></div>
           </div>
         </div>
         <div class="fkeys">
           <div class="fk"><b>F3</b>View spool</div>
-          <div class="fk"><b>F5</b>Gem output</div>
+          <div class="fk"><b>F5</b>Save output</div>
           <div class="fk"><b>F6</b>Hold/Release</div>
           <div class="fk"><b>F8</b>Purge</div>
           <div class="fk"><b>F9</b>Resubmit</div>
@@ -337,11 +337,11 @@
     </div>
   </div>
 
-  <h2>3 · Lokalt panel ↔ mainframe <span>varianten med upload/download</span></h2>
-  <p class="note">Her er det venstre panel den lokale disk — samme liste, samme taster. F5 åbner overførselsdialogen,
-     som er det eneste sted hvor mainframe-virkeligheden må stikke hovedet frem: tekst kontra binær, codepage,
-     og hvilket RECFM/LRECL filen lander i. Alt andet kan gættes rigtigt, så dialogen er forudfyldt og kan
-     springes over med Shift+F5.</p>
+  <h2>3 · Local pane ↔ mainframe <span>the upload/download variant</span></h2>
+  <p class="note">Here the left pane is the local disk — same list, same keys. F5 opens the transfer dialog,
+     which is the one place mainframe reality is allowed to show its head: text versus binary, codepage,
+     and which RECFM/LRECL the file lands in. Everything else can be guessed correctly, so the dialog is
+     pre-filled and can be skipped with Shift+F5.</p>
 
   <div class="vscode modal-host">
     <div class="body" style="min-height:420px">
@@ -351,8 +351,8 @@
           <!-- LOCAL PANE -->
           <div class="pane">
             <div class="pane-head">
-              <span class="pill">💻 <b>Denne PC</b> ▾</span>
-              <span class="seg"><span class="on">Lokal</span><span>DS</span><span>USS</span><span>JES</span></span>
+              <span class="pill">💻 <b>This PC</b> ▾</span>
+              <span class="seg"><span class="on">Local</span><span>DS</span><span>USS</span><span>JES</span></span>
               <span class="spacer"></span><span class="icobtn">⟳</span><span class="icobtn">☰</span><span class="icobtn">⭐</span>
             </div>
             <div class="pathbar"><span>C:\code\git\mc\jcl</span></div>
@@ -362,7 +362,7 @@
                 <th style="width:16%" class="num">Size</th><th style="width:26%">Date</th><th style="width:12%">Attr</th>
               </tr></thead>
               <tbody>
-                <tr><td class="up"><span class="ico">↰</span>..</td><td colspan="4" class="dim">&lt;OP-NIVEAU&gt;</td></tr>
+                <tr><td class="up"><span class="ico">↰</span>..</td><td colspan="4" class="dim">&lt;UP ONE LEVEL&gt;</td></tr>
                 <tr><td><span class="ico">📁</span>templates</td><td class="dim">—</td><td class="num dim">&lt;DIR&gt;</td><td class="dim">2026/08/14 10:22</td><td class="dim">d---</td></tr>
                 <tr class="mark"><td><span class="ico">🗎</span>backup01</td><td>jcl</td><td class="num">3 208</td><td>2026/08/20 08:41</td><td>-a--</td></tr>
                 <tr class="mark sel"><td><span class="ico">🗎</span>backup02</td><td>jcl</td><td class="num">2 940</td><td>2026/08/20 08:41</td><td>-a--</td></tr>
@@ -373,8 +373,8 @@
               </tbody>
             </table>
             <div class="pane-foot">
-              <span>3 af 7 markeret — 6 236 byte</span>
-              <span class="r">C: 214 GB fri</span>
+              <span>3 of 7 selected — 6,236 bytes</span>
+              <span class="r">C: 214 GB free</span>
             </div>
           </div>
 
@@ -382,7 +382,7 @@
           <div class="pane inactive">
             <div class="pane-head">
               <span class="pill">🖧 <b>LPAR1</b> ▾</span>
-              <span class="seg"><span>Lokal</span><span class="on">DS</span><span>USS</span><span>JES</span></span>
+              <span class="seg"><span>Local</span><span class="on">DS</span><span>USS</span><span>JES</span></span>
               <span class="spacer"></span><span class="icobtn">⟳</span><span class="icobtn">☰</span><span class="icobtn">⭐</span>
             </div>
             <div class="pathbar">
@@ -396,7 +396,7 @@
                 <th style="width:26%">Changed</th><th style="width:22%">ID</th>
               </tr></thead>
               <tbody>
-                <tr><td class="up"><span class="ico">↰</span>..</td><td colspan="3" class="dim">&lt;OP-NIVEAU&gt;</td></tr>
+                <tr><td class="up"><span class="ico">↰</span>..</td><td colspan="3" class="dim">&lt;UP ONE LEVEL&gt;</td></tr>
                 <tr><td><span class="ico">🗎</span>ALLOCDB</td><td class="dim">01.04</td><td class="dim">2026/07/02 09:11</td><td class="dim">IBMUSER</td></tr>
                 <tr><td><span class="ico">🗎</span>BACKUP01</td><td class="dim">02.11</td><td class="dim">2026/08/12 14:03</td><td class="dim">SANJ</td></tr>
                 <tr><td><span class="ico">🗎</span>COMPILE</td><td class="dim">05.28</td><td class="dim">2026/08/18 07:44</td><td class="dim">SANJ</td></tr>
@@ -406,8 +406,8 @@
               </tbody>
             </table>
             <div class="pane-foot">
-              <span class="r">0 af 21 markeret</span>
-              <span class="r">3390 · VOL=PRD001 · 62 % brugt</span>
+              <span class="r">0 of 21 selected</span>
+              <span class="r">3390 · VOL=PRD001 · 62 % used</span>
             </div>
           </div>
         </div>
@@ -416,7 +416,7 @@
           <div class="fk"><b>F3</b>View</div>
           <div class="fk"><b>F4</b>Edit</div>
           <div class="fk"><b>F5</b>Upload</div>
-          <div class="fk"><b>F6</b>Flyt</div>
+          <div class="fk"><b>F6</b>Move</div>
           <div class="fk"><b>F7</b>Allocate</div>
           <div class="fk"><b>F8</b>Delete</div>
           <div class="fk"><b>F9</b>Submit</div>
@@ -428,7 +428,7 @@
           <span class="sp"></span>
           <span>backup01.jcl → BACKUP01</span>
           <span class="prog" style="width:120px;flex:none"><i></i></span>
-          <span>1 af 3</span>
+          <span>1 of 3</span>
         </div>
       </div>
     </div>
@@ -436,34 +436,34 @@
     <!-- F5 transfer dialog -->
     <div class="backdrop"></div>
     <div class="modal">
-      <div class="mh">Kopiér 3 filer til LPAR1 <span>F5</span></div>
+      <div class="mh">Copy 3 files to LPAR1 <span>F5</span></div>
       <div class="mb">
         <div class="row"><label>Destination</label>
           <span class="field sel-field">IBMUSER.PROD.JCL(*)<span class="caret"></span></span></div>
-        <div class="row"><label>Overførsel</label>
-          <span class="radio"><i class="on">Tekst</i><i>Binær</i><i>Auto (efter filtype)</i></span></div>
-        <div class="hint">Tekst konverterer linjeskift og tegnsæt; binær sender byte for byte.</div>
+        <div class="row"><label>Transfer</label>
+          <span class="radio"><i class="on">Text</i><i>Binary</i><i>Auto (by file type)</i></span></div>
+        <div class="hint">Text converts line endings and character set; binary sends byte for byte.</div>
         <div class="row"><label>Codepage</label>
           <span class="field" style="flex:none;width:140px">IBM-1140 ▾</span>
           <label style="width:auto">RECFM</label>
           <span class="field" style="flex:none;width:70px">FB ▾</span>
           <label style="width:auto">LRECL</label>
           <span class="field" style="flex:none;width:60px">80</span></div>
-        <div class="hint">Arvet fra destinationens dataset — vist så du kan se hvad der sker.</div>
-        <div class="row"><label>For lange linjer</label>
-          <span class="radio"><i class="on">Ombryd</i><i>Afkort</i><i>Afbryd</i></span></div>
-        <div class="row"><label>Ved konflikt</label>
-          <span class="radio"><i class="on">Spørg</i><i>Overskriv</i><i>Spring over</i><i>Nyere</i></span></div>
+        <div class="hint">Inherited from the destination dataset — shown so you can see what happens.</div>
+        <div class="row"><label>Long lines</label>
+          <span class="radio"><i class="on">Wrap</i><i>Truncate</i><i>Abort</i></span></div>
+        <div class="row"><label>On conflict</label>
+          <span class="radio"><i class="on">Ask</i><i>Overwrite</i><i>Skip</i><i>Newer</i></span></div>
       </div>
       <div class="mf">
-        <span class="btn">Læg i kø</span>
-        <span class="btn">Annullér</span>
-        <span class="btn pri">Kopiér</span>
+        <span class="btn">Queue it</span>
+        <span class="btn">Cancel</span>
+        <span class="btn pri">Copy</span>
       </div>
     </div>
   </div>
 
-  <h2>4 · Arkitektur <span>webview ↔ extension host ↔ Zowe</span></h2>
+  <h2>4 · Architecture <span>webview ↔ extension host ↔ Zowe</span></h2>
 
   <svg viewBox="0 0 1120 300" width="1120" height="300" font-family="-apple-system,Segoe UI,sans-serif">
     <defs>
@@ -481,14 +481,14 @@
 
     <rect x="32" y="60" width="200" height="86" rx="6" fill="#1e1e1e" stroke="#4fc1ff"/>
     <text x="48" y="84" fill="#fff" font-size="14" font-weight="600">Webview (UI)</text>
-    <text x="48" y="104" fill="#8a8a8a" font-size="12">Dual-pane, tastatur,</text>
-    <text x="48" y="121" fill="#8a8a8a" font-size="12">markering, F-taster</text>
-    <text x="48" y="138" fill="#8a8a8a" font-size="12">Virtuel liste (10k+ rækker)</text>
+    <text x="48" y="104" fill="#8a8a8a" font-size="12">Dual pane, keyboard,</text>
+    <text x="48" y="121" fill="#8a8a8a" font-size="12">selection, F-keys</text>
+    <text x="48" y="138" fill="#8a8a8a" font-size="12">Virtual list (10k+ rows)</text>
 
     <rect x="268" y="60" width="200" height="86" rx="6" fill="#1e1e1e" stroke="#3c3c3c"/>
     <text x="284" y="84" fill="#fff" font-size="14" font-weight="600">Extension host</text>
-    <text x="284" y="104" fill="#8a8a8a" font-size="12">Kommando-router</text>
-    <text x="284" y="121" fill="#8a8a8a" font-size="12">Transfer-kø + fremdrift</text>
+    <text x="284" y="104" fill="#8a8a8a" font-size="12">Command router</text>
+    <text x="284" y="121" fill="#8a8a8a" font-size="12">Transfer queue + progress</text>
     <text x="284" y="138" fill="#8a8a8a" font-size="12">FileSystemProvider</text>
 
     <path d="M236,95 L264,95" stroke="#4fc1ff" stroke-width="1.6" marker-end="url(#a)"/>
@@ -497,8 +497,8 @@
 
     <rect x="32" y="180" width="436" height="72" rx="6" fill="#1e1e1e" stroke="#3c3c3c"/>
     <text x="48" y="204" fill="#fff" font-size="14" font-weight="600">Zowe Explorer API + Zowe SDK</text>
-    <text x="48" y="224" fill="#8a8a8a" font-size="12">Genbruger brugerens eksisterende ~/.zowe-profiler og team config</text>
-    <text x="48" y="242" fill="#8a8a8a" font-size="12">Kerberos / MFA / cert-håndtering får vi gratis</text>
+    <text x="48" y="224" fill="#8a8a8a" font-size="12">Reuses the user's existing ~/.zowe profiles and team config</text>
+    <text x="48" y="242" fill="#8a8a8a" font-size="12">Kerberos / MFA / certificate handling comes for free</text>
     <path d="M250,150 L250,176" stroke="#4fc1ff" stroke-width="1.6" marker-end="url(#a)"/>
 
     <!-- network -->
@@ -516,21 +516,21 @@
     <rect x="642" y="136" width="140" height="116" rx="6" fill="#1e1e1e" stroke="#3c3c3c"/>
     <text x="658" y="160" fill="#fff" font-size="13" font-weight="600">MVS</text>
     <text x="658" y="180" fill="#8a8a8a" font-size="11.5">Datasets PS/PO</text>
-    <text x="658" y="198" fill="#8a8a8a" font-size="11.5">Medlemmer</text>
-    <text x="658" y="216" fill="#8a8a8a" font-size="11.5">Katalog / VTOC</text>
-    <text x="658" y="234" fill="#8a8a8a" font-size="11.5">Migreret (HSM)</text>
+    <text x="658" y="198" fill="#8a8a8a" font-size="11.5">Members</text>
+    <text x="658" y="216" fill="#8a8a8a" font-size="11.5">Catalog / VTOC</text>
+    <text x="658" y="234" fill="#8a8a8a" font-size="11.5">Migrated (HSM)</text>
 
     <rect x="795" y="136" width="140" height="116" rx="6" fill="#1e1e1e" stroke="#3c3c3c"/>
     <text x="811" y="160" fill="#fff" font-size="13" font-weight="600">USS</text>
-    <text x="811" y="180" fill="#8a8a8a" font-size="11.5">Stier og filer</text>
-    <text x="811" y="198" fill="#8a8a8a" font-size="11.5">Rettigheder</text>
+    <text x="811" y="180" fill="#8a8a8a" font-size="11.5">Paths and files</text>
+    <text x="811" y="198" fill="#8a8a8a" font-size="11.5">Permissions</text>
     <text x="811" y="216" fill="#8a8a8a" font-size="11.5">Symlinks</text>
     <text x="811" y="234" fill="#8a8a8a" font-size="11.5">Tagging / codepage</text>
 
     <rect x="948" y="136" width="140" height="116" rx="6" fill="#1e1e1e" stroke="#3c3c3c"/>
     <text x="964" y="160" fill="#fff" font-size="13" font-weight="600">JES</text>
-    <text x="964" y="180" fill="#8a8a8a" font-size="11.5">Jobkø</text>
-    <text x="964" y="198" fill="#8a8a8a" font-size="11.5">Spool-DD'er</text>
+    <text x="964" y="180" fill="#8a8a8a" font-size="11.5">Job queue</text>
+    <text x="964" y="198" fill="#8a8a8a" font-size="11.5">Spool DDs</text>
     <text x="964" y="216" fill="#8a8a8a" font-size="11.5">Submit / purge</text>
     <text x="964" y="234" fill="#8a8a8a" font-size="11.5">Return codes</text>
 
@@ -540,50 +540,50 @@
     <path d="M712,126 L1018,126" stroke="#3c3c3c" stroke-width="1.5"/>
   </svg>
 
-  <h2>5 · De idéer der bærer det <span>hvad gør det bedre end Zowe Explorer</span></h2>
+  <h2>5 · The load-bearing ideas <span>what makes it better than Zowe Explorer</span></h2>
   <div class="cards">
     <div class="card">
-      <h3>Ét panel, tre verdener</h3>
-      <p>DS / USS / JES er bare "filsystemer" bag samme liste. Samme taster overalt — du lærer det én gang.</p>
+      <h3>One pane, three worlds</h3>
+      <p>DS / USS / JES are just "file systems" behind the same list. Same keys everywhere — you learn it once.</p>
     </div>
     <div class="card">
-      <h3>F5 på tværs af LPAR'er</h3>
-      <p>Venstre panel LPAR1, højre LPAR2. Kopiér PDS-medlem → USS-fil, spool → USS, med automatisk EBCDIC↔ASCII-konvertering.</p>
+      <h3>F5 across LPARs</h3>
+      <p>Left pane LPAR1, right LPAR2. Copy PDS member → USS file, spool → USS, with automatic EBCDIC↔ASCII conversion.</p>
     </div>
     <div class="card">
-      <h3>Kommandolinjen nederst</h3>
-      <p><code>submit</code>, <code>tso</code>, <code>console</code>, <code>cd</code> — skrevet direkte, med panelets kontekst som udgangspunkt.</p>
+      <h3>The command line at the bottom</h3>
+      <p><code>submit</code>, <code>tso</code>, <code>console</code>, <code>cd</code> — typed straight in, starting from the pane's own context.</p>
     </div>
     <div class="card">
-      <h3>Baggrundskø</h3>
-      <p>Overførsler kører i en kø med fremdrift i statuslinjen. UI'et fryser aldrig, selvom du henter et 18 MB tarball.</p>
+      <h3>Background queue</h3>
+      <p>Transfers run in a queue with progress in the status bar. The UI never freezes, even while you fetch an 18 MB tarball.</p>
     </div>
     <div class="card">
-      <h3>Virtuel liste</h3>
-      <p>Et PDS med 20 000 medlemmer skal scrolle lige så glat som ét med 20. Kun synlige rækker renderes.</p>
+      <h3>Virtual list</h3>
+      <p>A PDS with 20,000 members has to scroll as smoothly as one with 20. Only visible rows are rendered.</p>
     </div>
     <div class="card">
       <h3>Quick filter</h3>
-      <p>Bare begynd at skrive: listen filtreres live. <code>Ctrl+S</code> som i Total Commander, plus <code>*</code>-mønstre til dataset-navne.</p>
+      <p>Just start typing: the list filters live. <code>Ctrl+S</code> as in Total Commander, plus <code>*</code> patterns for dataset names.</p>
     </div>
   </div>
 
-  <h2>6 · Tastaturkort <span>udgangspunkt</span></h2>
+  <h2>6 · Key map <span>starting point</span></h2>
   <table class="keys">
-    <tr><th>Tast</th><th>Handling</th><th>Zowe-kald</th></tr>
-    <tr><td>Tab</td><td>Skift aktivt panel</td><td>—</td></tr>
-    <tr><td>Insert / Space</td><td>Markér / afmarkér</td><td>—</td></tr>
-    <tr><td>Enter</td><td>Åbn medlem, gå ind i PDS/katalog/job</td><td>listMembers, listFiles, getSpoolFiles</td></tr>
-    <tr><td>F3</td><td>Vis skrivebeskyttet</td><td>getContents</td></tr>
-    <tr><td>F4</td><td>Redigér i VS Code-editor</td><td>getContents → uploadFile ved save</td></tr>
-    <tr><td>F5</td><td>Kopiér til det andet panel</td><td>downloadDataSet + uploadFile</td></tr>
-    <tr><td>F6</td><td>Omdøb / flyt</td><td>renameDataSet, hMove</td></tr>
-    <tr><td>F7</td><td>Allokér dataset / opret katalog</td><td>createDataSet, createUssFile</td></tr>
-    <tr><td>F8 / Delete</td><td>Slet (med bekræftelse)</td><td>deleteDataSet, deleteJob</td></tr>
-    <tr><td>F9</td><td>Submit JCL</td><td>submitJcl → hop til JES-panel</td></tr>
-    <tr><td>Ctrl+U</td><td>Byt paneler</td><td>—</td></tr>
-    <tr><td>Ctrl+D</td><td>Favoritter / hop til gemt sti</td><td>—</td></tr>
-    <tr><td>Alt+F7</td><td>Søg i medlemmer/filer</td><td>searchDataSets</td></tr>
+    <tr><th>Key</th><th>Action</th><th>Zowe call</th></tr>
+    <tr><td>Tab</td><td>Switch active pane</td><td>—</td></tr>
+    <tr><td>Insert / Space</td><td>Select / deselect</td><td>—</td></tr>
+    <tr><td>Enter</td><td>Open member, step into PDS/directory/job</td><td>listMembers, listFiles, getSpoolFiles</td></tr>
+    <tr><td>F3</td><td>View read-only</td><td>getContents</td></tr>
+    <tr><td>F4</td><td>Edit in the VS Code editor</td><td>getContents → uploadFile on save</td></tr>
+    <tr><td>F5</td><td>Copy to the other pane</td><td>downloadDataSet + uploadFile</td></tr>
+    <tr><td>F6</td><td>Rename / move</td><td>renameDataSet, hMove</td></tr>
+    <tr><td>F7</td><td>Allocate dataset / create directory</td><td>createDataSet, createUssFile</td></tr>
+    <tr><td>F8 / Delete</td><td>Delete (with confirmation)</td><td>deleteDataSet, deleteJob</td></tr>
+    <tr><td>F9</td><td>Submit JCL</td><td>submitJcl → jump to the JES pane</td></tr>
+    <tr><td>Ctrl+U</td><td>Swap panes</td><td>—</td></tr>
+    <tr><td>Ctrl+D</td><td>Favourites / jump to a saved path</td><td>—</td></tr>
+    <tr><td>Alt+F7</td><td>Search members/files</td><td>searchDataSets</td></tr>
   </table>
 
 </div>

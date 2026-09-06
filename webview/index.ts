@@ -220,7 +220,7 @@ class App {
           ? this.defaults
           : await transferDialog(
             this.defaults, ids.length,
-            target?.profile || 'lokal disk', target?.kind === 'ds' ? target.path : '',
+            target?.profile || 'local disk', target?.kind === 'ds' ? target.path : '',
           );
         if (!options) return;
         return send({ type: 'copy', from: this.active, entryIds: ids, options });
@@ -234,9 +234,9 @@ class App {
         const location = pane.location;
         const dataset = location?.kind === 'ds' && isDatasetFilter(location.path);
         const name = await prompt(
-          `Omdøb ${entry.name}`,
+          `Rename ${entry.name}`,
           dataset ? `'${entry.name}'` : entry.name,
-          dataset ? 'Uden apostroffer sættes din bruger på som første kvalifikation.' : '',
+          dataset ? 'Without apostrophes your user id goes in front as the first qualifier.' : '',
         );
         if (!name) return;
         return send({ type: 'rename', pane: this.active, entryId: entry.id, newName: name });
@@ -258,7 +258,7 @@ class App {
           });
         }
         const name = await prompt(
-          location.kind === 'ds' ? 'Navn på nyt medlem' : 'Navn på nyt katalog',
+          location.kind === 'ds' ? 'Name of the new member' : 'Name of the new folder',
         );
         if (!name) return;
         return send({ type: 'create', pane: this.active, name });

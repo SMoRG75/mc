@@ -104,7 +104,7 @@
         "mc.ds.defaultFilter": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Datasetfilter et DS-panel åbner på når stien er tom. Tomt betyder `<DIN-BRUGER>.*`. Undgå et bart `*` — det beder z/OSMF om at gennemgå hele kataloget og fejler typisk i TSO's listeservices (LMDINIT)."
+          "markdownDescription": "Dataset filter a DS pane opens on when its path is empty. Empty means `<YOUR-USER>.*`. Avoid a bare `*` — it asks z/OSMF to walk the entire catalog and usually fails in TSO's list services (LMDINIT)."
         },
         "mc.jes.owner": {
           "type": "string",

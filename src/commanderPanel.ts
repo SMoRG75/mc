@@ -181,7 +181,7 @@ export class CommanderPanel {
           // same listing as before, which looks exactly like nothing happened.
           if (msg.dataset && !state.entries.some((e) => e.dto.name === created)) {
             void vscode.window.showInformationMessage(
-              `${created} er allokeret, men ligger uden for filteret '${state.location.path}'.`,
+              `${created} was allocated, but it is outside the filter '${state.location.path}'.`,
             );
           }
           break;
@@ -276,7 +276,7 @@ export class CommanderPanel {
     const targetLoc = this.panes[to].location;
 
     if (!target.capabilities(targetLoc).write) {
-      throw new Error(`Der kan ikke skrives til ${target.label(targetLoc)}.`);
+      throw new Error(`Cannot write to ${target.label(targetLoc)}.`);
     }
 
     const requests: TransferRequest[] = [];
@@ -286,7 +286,7 @@ export class CommanderPanel {
         // Recursive copy is a roadmap item; failing loudly beats copying half a tree.
         this.post({
           type: 'error', pane: from,
-          message: `'${entry.dto.name}' er en mappe — rekursiv kopiering er ikke implementeret endnu.`,
+          message: `'${entry.dto.name}' is a folder — recursive copy is not implemented yet.`,
         });
         continue;
       }
@@ -294,10 +294,10 @@ export class CommanderPanel {
       if (options.onConflict !== 'overwrite' && await target.exists(targetLoc, name)) {
         if (options.onConflict === 'skip') continue;
         const answer = await vscode.window.showWarningMessage(
-          `${name} findes allerede i ${target.label(targetLoc)}.`,
-          { modal: true }, 'Overskriv', 'Spring over',
+          `${name} already exists in ${target.label(targetLoc)}.`,
+          { modal: true }, 'Overwrite', 'Skip',
         );
-        if (answer !== 'Overskriv') continue;
+        if (answer !== 'Overwrite') continue;
       }
       requests.push({ source, sourceLoc, target, targetLoc, entry, name, options, move });
     }
@@ -315,12 +315,12 @@ export class CommanderPanel {
     if (settings.confirmDelete()) {
       const what = entries.length === 1
         ? entries[0]!.dto.name
-        : `${entries.length} elementer`;
+        : `${entries.length} items`;
       const answer = await vscode.window.showWarningMessage(
-        `Slet ${what} i ${this.provider(pane).label(this.panes[pane].location)}?`,
-        { modal: true, detail: 'Det kan ikke fortrydes.' }, 'Slet',
+        `Delete ${what} in ${this.provider(pane).label(this.panes[pane].location)}?`,
+        { modal: true, detail: 'This cannot be undone.' }, 'Delete',
       );
-      if (answer !== 'Slet') return;
+      if (answer !== 'Delete') return;
     }
     await this.provider(pane).remove(this.panes[pane].location, entries);
     await this.refresh(pane);
@@ -328,12 +328,12 @@ export class CommanderPanel {
 
   private async submit(pane: PaneId, entryIds: string[]): Promise<void> {
     const provider = this.provider(pane);
-    if (!provider.submit) throw new Error('Der kan ikke submittes herfra.');
+    if (!provider.submit) throw new Error('Nothing can be submitted from here.');
     const ids = await provider.submit(
       this.panes[pane].location, entryIds.map((id) => this.entry(pane, id)),
     );
     const other: PaneId = pane === 'left' ? 'right' : 'left';
-    void vscode.window.showInformationMessage(`Submittet: ${ids.join(', ')}`);
+    void vscode.window.showInformationMessage(`Submitted: ${ids.join(', ')}`);
 
     // Point the other pane at the job queue so the result is one glance away.
     this.panes[other].location = {
@@ -351,7 +351,7 @@ export class CommanderPanel {
       this.panes.right.location, rightEntryId,
       this.entry('right', rightEntryId).dto.name, true,
     );
-    await vscode.commands.executeCommand('vscode.diff', left, right, 'Mainframe Commander: sammenlign');
+    await vscode.commands.executeCommand('vscode.diff', left, right, 'Mainframe Commander: compare');
   }
 
   /**
@@ -377,7 +377,7 @@ export class CommanderPanel {
         const entry = this.panes[pane].entries.find(
           (e) => e.dto.name.toUpperCase() === argument.toUpperCase(),
         );
-        if (!entry) throw new Error(`'${argument}' findes ikke i panelet.`);
+        if (!entry) throw new Error(`'${argument}' is not in the pane.`);
         await this.submit(pane, [entry.dto.id]);
         return;
       }
@@ -385,7 +385,7 @@ export class CommanderPanel {
         await this.refresh(pane);
         return;
       default:
-        throw new Error(`Ukendt kommando '${verb}'. Kendte: cd, submit, refresh.`);
+        throw new Error(`Unknown command '${verb}'. Known commands: cd, submit, refresh.`);
     }
   }
 
@@ -410,7 +410,7 @@ export class CommanderPanel {
 
   private entry(pane: PaneId, entryId: string): Entry {
     const entry = this.panes[pane].entries.find((e) => e.dto.id === entryId);
-    if (!entry) throw new Error('Rækken findes ikke længere — panelet er blevet opdateret.');
+    if (!entry) throw new Error('That row no longer exists — the pane has been refreshed.');
     return entry;
   }
 
@@ -425,7 +425,7 @@ export class CommanderPanel {
     );
     const nonce = nonceOf(32);
     return `<!DOCTYPE html>
-<html lang="da">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none';

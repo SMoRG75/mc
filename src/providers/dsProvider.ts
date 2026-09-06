@@ -112,8 +112,8 @@ export class DsProvider implements PaneProvider {
       columns: DATASET_COLUMNS,
       entries,
       status: withAttributes
-        ? `${items.length} datasæt`
-        : `${items.length} datasæt · uden attributter`,
+        ? `${items.length} data set${items.length === 1 ? '' : 's'}`
+        : `${items.length} data set${items.length === 1 ? '' : 's'} · without attributes`,
       truncated: items.length > limit,
     };
   }
@@ -181,7 +181,7 @@ export class DsProvider implements PaneProvider {
       title: shape ? `${dsname} (${shape})` : dsname,
       columns: MEMBER_COLUMNS,
       entries,
-      status: attributes?.vol ? `VOL=${attributes.vol}` : `${items.length} medlemmer`,
+      status: attributes?.vol ? `VOL=${attributes.vol}` : `${items.length} member${items.length === 1 ? '' : 's'}`,
       truncated: items.length > limit,
     };
   }
@@ -203,8 +203,8 @@ export class DsProvider implements PaneProvider {
     if (ref.kind === 'member') return undefined;
     if (ref.migrated) {
       throw new UserFacingError(
-        `${ref.dsname} er migreret (HSM).`,
-        'Datasættet skal recalles før det kan læses. Brug F2 → Recall, eller tilgå det via TSO.',
+        `${ref.dsname} is migrated (HSM).`,
+        'The dataset has to be recalled before it can be read. Use F2 → Recall, or reach it through TSO.',
       );
     }
     return isPartitioned(ref.dsorg) ? { ...loc, path: ref.dsname } : undefined;
@@ -325,13 +325,13 @@ function explainListFailure(err: unknown, filter: string): UserFacingError {
   const haystack = `${message}\n${detail ?? ''}`;
 
   if (!/LMDINIT|LMDLIST|ISPF|TSO Prompt|IKJ566/i.test(haystack)) {
-    return new UserFacingError(`Kunne ikke liste '${filter}'.`, `${message}\n${detail ?? ''}`.trim());
+    return new UserFacingError(`Could not list '${filter}'.`, `${message}\n${detail ?? ''}`.trim());
   }
   return new UserFacingError(
-    `z/OSMF kunne ikke liste '${filter}'.`,
-    'Filteret rammer sandsynligvis for bredt, eller resultatet indeholder '
-    + 'migrerede datasæt som DFSMShsm vil spørge om. Prøv et snævrere filter, '
-    + "eller sæt et fast udgangspunkt i indstillingen 'mc.ds.defaultFilter'.\n\n"
+    `z/OSMF could not list '${filter}'.`,
+    'The filter probably matches too much, or the result contains migrated '
+    + 'data sets that DFSMShsm wants to prompt about. Try a narrower filter, '
+    + "or set a fixed starting point in the 'mc.ds.defaultFilter' setting.\n\n"
     + `${message}\n${detail ?? ''}`.trim(),
   );
 }
@@ -426,11 +426,11 @@ function datasetName(raw: string, prefix: string): string {
     && qualifiers.every((q) => /^[A-Z$#@][A-Z0-9$#@-]{0,7}$/.test(q));
   if (!valid) {
     throw new UserFacingError(
-      `'${name}' er ikke et gyldigt datasætnavn.`,
-      'Et navn er op til 22 kvalifikatorer adskilt af punktum, hver på 1-8 tegn '
-      + '(A-Z, 0-9, @ # $ -, første tegn ikke et ciffer), og højst 44 tegn i alt.'
-      + (fullyQualified ? '' : `\n\n'${raw}' blev læst som ${name}, fordi navnet `
-        + 'ikke står i apostroffer. Sæt en apostrof foran for at bruge det som det står.'),
+      `'${name}' is not a valid dataset name.`,
+      'A name is up to 22 qualifiers separated by dots, each 1-8 characters '
+      + '(A-Z, 0-9, @ # $ -, not starting with a digit), and at most 44 characters in all.'
+      + (fullyQualified ? '' : `\n\n'${raw}' was read as ${name} because it is not `
+        + 'in apostrophes. Put an apostrophe in front to use it exactly as typed.'),
     );
   }
   return name;
@@ -452,7 +452,7 @@ function qualify(ref: DsRef): string {
 /** Member names are 1-8 uppercase characters; local file names rarely are. */
 function memberName(name: string): string {
   const stem = name.replace(/\.[^.]*$/, '').toUpperCase().replace(/[^A-Z0-9$#@]/g, '');
-  if (!stem) throw new UserFacingError(`'${name}' kan ikke omsættes til et medlemsnavn.`);
+  if (!stem) throw new UserFacingError(`'${name}' cannot be turned into a member name.`);
   return stem.slice(0, 8);
 }
 

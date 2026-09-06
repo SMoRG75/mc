@@ -89,7 +89,7 @@ export class JesProvider implements PaneProvider {
         title: `JES2 · owner=${owner} · prefix=${prefix}${parsed.status === 'all' ? '' : ` · ${parsed.status}`}`,
         columns: JOB_COLUMNS,
         entries,
-        status: `${jobs.length} jobs`,
+        status: `${jobs.length} job${jobs.length === 1 ? '' : 's'}`,
         truncated: false,
         views: this.views(loc, { ...parsed, owner, prefix }, user),
       };
@@ -113,7 +113,7 @@ export class JesProvider implements PaneProvider {
           id: String(file.id),
           name: file.ddname,
           step: file.stepname ?? '',
-          records: (file['record-count'] ?? 0).toLocaleString('da-DK'),
+          records: (file['record-count'] ?? 0).toLocaleString('en-US'),
           class: file.class ?? '',
         },
       },
@@ -123,7 +123,7 @@ export class JesProvider implements PaneProvider {
       title: `${jobid} · ${jobname} · spool`,
       columns: SPOOL_COLUMNS,
       entries,
-      status: `${files.length} spool-filer`,
+      status: `${files.length} spool file${files.length === 1 ? '' : 's'}`,
       truncated: false,
       // Picking a view from inside a job steps back out into that view.
       views: this.views(loc, parsed, sessionUser(session)),
@@ -133,7 +133,7 @@ export class JesProvider implements PaneProvider {
   /**
    * The four ways of looking at the queue.
    *
-   * `Mine` and `Alle` set the owner; `Aktive` and `Output` narrow to a queue and
+   * `Mine` and `All` set the owner; `Active` and `Output` narrow to a queue and
    * keep whatever owner is already in force, so drilling into someone else's
    * jobs and then asking for their output does what it says.
    */
@@ -150,9 +150,9 @@ export class JesProvider implements PaneProvider {
 
     return [
       { id: 'mine', label: 'Mine', location: at({ owner: user || owner, status: 'all' }), active: current === 'mine' },
-      { id: 'active', label: 'Aktive', location: at({ status: 'active' }), active: current === 'active' },
+      { id: 'active', label: 'Active', location: at({ status: 'active' }), active: current === 'active' },
       { id: 'output', label: 'Output', location: at({ status: 'output' }), active: current === 'output' },
-      { id: 'all', label: 'Alle', location: at({ owner: '*', status: 'all' }), active: current === 'all' },
+      { id: 'all', label: 'All', location: at({ owner: '*', status: 'all' }), active: current === 'all' },
     ];
   }
 
@@ -188,8 +188,8 @@ export class JesProvider implements PaneProvider {
 
   async write(): Promise<void> {
     throw new UserFacingError(
-      'Man kan ikke skrive ind i JES-køen.',
-      'Brug F9 til at submitte JCL fra et dataset eller en USS-fil i stedet.',
+      'You cannot write into the JES queue.',
+      'Use F9 to submit JCL from a dataset or a USS file instead.',
     );
   }
 
@@ -203,18 +203,18 @@ export class JesProvider implements PaneProvider {
     for (const entry of entries) {
       const ref = entry.ref as JesRef;
       if (ref.kind !== 'job') {
-        throw new UserFacingError('Enkelte spool-filer kan ikke slettes — kun hele jobbet.');
+        throw new UserFacingError('A single spool file cannot be deleted — only the whole job.');
       }
       await DeleteJobs.deleteJob(session, ref.jobname, ref.jobid);
     }
   }
 
   async rename(): Promise<void> {
-    throw new UserFacingError('Jobs kan ikke omdøbes.');
+    throw new UserFacingError('Jobs cannot be renamed.');
   }
 
   async create(): Promise<string> {
-    throw new UserFacingError('Brug F9 til at submitte et job.');
+    throw new UserFacingError('Use F9 to submit a job.');
   }
 
   /** F9 on a job resubmits its JCL unchanged. */

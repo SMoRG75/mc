@@ -54,7 +54,7 @@ export function prompt(title: string, value = '', hint = ''): Promise<string | u
       <div class="mb"><input class="field" type="text" spellcheck="false">
         ${hint ? `<p class="hint flush">${escapeHtml(hint)}</p>` : ''}</div>
       <div class="mf">
-        <button type="button" class="btn" data-cancel>Annullér</button>
+        <button type="button" class="btn" data-cancel>Cancel</button>
         <button type="submit" class="btn pri">OK</button>
       </div>`;
     const input = box.querySelector('input') as HTMLInputElement;
@@ -75,7 +75,7 @@ export function confirm(title: string, detail: string): Promise<boolean | undefi
       <div class="mh">${escapeHtml(title)}</div>
       <div class="mb"><p>${escapeHtml(detail)}</p></div>
       <div class="mf">
-        <button class="btn" data-no>Annullér</button>
+        <button class="btn" data-no>Cancel</button>
         <button class="btn pri" data-yes>OK</button>
       </div>`;
     box.querySelector('[data-no]')?.addEventListener('click', () => resolve(undefined));
@@ -96,26 +96,26 @@ export function transferDialog(
   return modal<TransferOptions>((resolve) => {
     const box = document.createElement('form');
     box.innerHTML = `
-      <div class="mh">Kopiér ${count} ${count === 1 ? 'fil' : 'filer'} til ${escapeHtml(targetLabel)}<span>F5</span></div>
+      <div class="mh">Copy ${count} ${count === 1 ? 'file' : 'files'} to ${escapeHtml(targetLabel)}<span>F5</span></div>
       <div class="mb">
         <label class="row"><span>Destination</span>
           <input class="field" name="destination" spellcheck="false"></label>
-        <div class="row"><span>Overførsel</span>${radios('mode', [
-          ['text', 'Tekst'], ['binary', 'Binær'], ['auto', 'Auto (efter filtype)'],
+        <div class="row"><span>Transfer</span>${radios('mode', [
+          ['text', 'Text'], ['binary', 'Binary'], ['auto', 'Auto (by file type)'],
         ], defaults.mode)}</div>
-        <p class="hint">Tekst konverterer linjeskift og tegnsæt; binær sender byte for byte.</p>
+        <p class="hint">Text converts line endings and character set; binary sends byte for byte.</p>
         <label class="row"><span>Codepage</span>
           <input class="field short" name="codepage" spellcheck="false"></label>
-        <div class="row"><span>For lange linjer</span>${radios('longLines', [
-          ['wrap', 'Ombryd'], ['truncate', 'Afkort'], ['abort', 'Afbryd'],
+        <div class="row"><span>Long lines</span>${radios('longLines', [
+          ['wrap', 'Wrap'], ['truncate', 'Truncate'], ['abort', 'Abort'],
         ], defaults.longLines)}</div>
-        <div class="row"><span>Ved konflikt</span>${radios('onConflict', [
-          ['ask', 'Spørg'], ['overwrite', 'Overskriv'], ['skip', 'Spring over'],
+        <div class="row"><span>On conflict</span>${radios('onConflict', [
+          ['ask', 'Ask'], ['overwrite', 'Overwrite'], ['skip', 'Skip'],
         ], defaults.onConflict)}</div>
       </div>
       <div class="mf">
-        <button type="button" class="btn" data-cancel>Annullér</button>
-        <button type="submit" class="btn pri">Kopiér</button>
+        <button type="button" class="btn" data-cancel>Cancel</button>
+        <button type="submit" class="btn pri">Copy</button>
       </div>`;
 
     const form = box as HTMLFormElement;
@@ -157,48 +157,48 @@ export function datasetDialog(
     const box = document.createElement('form');
     box.className = 'alloc';
     box.innerHTML = `
-      <div class="mh">Allokér datasæt<span>F7</span></div>
+      <div class="mh">Allocate dataset<span>F7</span></div>
       <div class="mb">
-        <label class="row"><span>Navn</span>
+        <label class="row"><span>Name</span>
           <input class="field" name="name" spellcheck="false" autocapitalize="off"></label>
-        <p class="hint">Som i TSO: uden apostrof foran sættes din bruger på som første kvalifikation.</p>
-        <label class="row"><span>Som eksisterende</span>
-          <input class="field" name="like" spellcheck="false" placeholder="LIKE — tomt: brug felterne nedenfor"></label>
+        <p class="hint">As in TSO: without a leading apostrophe your user id goes in front as the first qualifier.</p>
+        <label class="row"><span>Like existing</span>
+          <input class="field" name="like" spellcheck="false" placeholder="LIKE — empty: use the fields below"></label>
         <div class="attrs">
           <div class="row"><span>Type</span>${radios('type', [
-            ['pdse', 'Bibliotek (PDS/E)'], ['pds', 'PDS'], ['seq', 'Sekventiel'],
+            ['pdse', 'Library (PDS/E)'], ['pds', 'PDS'], ['seq', 'Sequential'],
           ], 'pdse')}</div>
-          <label class="row"><span>Skabelon</span>
+          <label class="row"><span>Template</span>
             <select class="field" name="template">
-              <option value="fb80">JCL og kildekode — FB 80</option>
+              <option value="fb80">JCL and source — FB 80</option>
               <option value="fba133">Listing — FBA 133</option>
-              <option value="vb255">Variabel tekst — VB 255</option>
-              <option value="load">Load-modul — U, PDS/E</option>
-              <option value="custom">Egne værdier</option>
+              <option value="vb255">Variable text — VB 255</option>
+              <option value="load">Load module — U, PDS/E</option>
+              <option value="custom">Custom values</option>
             </select></label>
           <div class="row"><span>Format</span>
             <input class="field num" name="recfm" spellcheck="false" title="RECFM">
             <span class="unit">LRECL</span><input class="field num" name="lrecl" inputmode="numeric">
             <span class="unit">BLKSIZE</span><input class="field num" name="blksize" inputmode="numeric" placeholder="auto">
           </div>
-          <div class="row"><span>Plads</span>
-            <input class="field num" name="primary" inputmode="numeric" title="Primær">
-            <span class="unit">+</span><input class="field num" name="secondary" inputmode="numeric" title="Sekundær">
-            ${radios('alcunit', [['TRK', 'Spor'], ['CYL', 'Cylindre']], 'TRK')}
+          <div class="row"><span>Space</span>
+            <input class="field num" name="primary" inputmode="numeric" title="Primary">
+            <span class="unit">+</span><input class="field num" name="secondary" inputmode="numeric" title="Secondary">
+            ${radios('alcunit', [['TRK', 'Tracks'], ['CYL', 'Cylinders']], 'TRK')}
           </div>
-          <label class="row dirblk"><span>Katalogblokke</span>
+          <label class="row dirblk"><span>Directory blocks</span>
             <input class="field num" name="dirblk" inputmode="numeric"></label>
         </div>
         <div class="row"><span>Volume / SMS</span>
           <input class="field mid" name="volser" spellcheck="false" placeholder="VOLSER">
-          <input class="field mid" name="dataclass" spellcheck="false" placeholder="Dataklasse">
-          <input class="field mid" name="storclass" spellcheck="false" placeholder="Lagerklasse">
+          <input class="field mid" name="dataclass" spellcheck="false" placeholder="Data class">
+          <input class="field mid" name="storclass" spellcheck="false" placeholder="Storage class">
         </div>
-        <p class="hint">Tomme felter overlades til SMS og systemets standarder — også sammen med en model.</p>
+        <p class="hint">Empty fields are left to SMS and the system defaults — with a model as well.</p>
       </div>
       <div class="mf">
-        <button type="button" class="btn" data-cancel>Annullér</button>
-        <button type="submit" class="btn pri">Allokér</button>
+        <button type="button" class="btn" data-cancel>Cancel</button>
+        <button type="submit" class="btn pri">Allocate</button>
       </div>`;
 
     const form = box as HTMLFormElement;

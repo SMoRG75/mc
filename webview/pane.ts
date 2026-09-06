@@ -4,7 +4,7 @@ import type {
 import { VirtualList } from './virtualList';
 
 const KINDS: [PaneKind, string][] = [
-  ['local', 'Lokal'], ['ds', 'DS'], ['uss', 'USS'], ['jes', 'JES'],
+  ['local', 'Local'], ['ds', 'DS'], ['uss', 'USS'], ['jes', 'JES'],
 ];
 
 /** One half of the screen: header, path bar, rows, footer. */
@@ -113,7 +113,7 @@ export class Pane {
     if (listing.truncated) {
       const badge = document.createElement('span');
       badge.className = 'badge warn';
-      badge.textContent = 'afkortet';
+      badge.textContent = 'truncated';
       this.pathBar.append(badge);
     }
 
@@ -159,7 +159,7 @@ export class Pane {
     };
     const rows = this.listing.entries
       .filter((entry) => !this.filter || entry.name.toLowerCase().includes(this.filter))
-      .sort((a, b) => (a.sortKey ?? a.name).localeCompare(b.sortKey ?? b.name, 'da'));
+      .sort((a, b) => (a.sortKey ?? a.name).localeCompare(b.sortKey ?? b.name, 'en'));
 
     this.view = [up, ...rows];
     this.list.setData(this.listing.columns, this.view);
@@ -231,8 +231,8 @@ export class Pane {
       .reduce((sum, entry) => sum + (entry.size ?? 0), 0);
     const left = document.createElement('span');
     left.textContent = this.marked.size > 0
-      ? `${this.marked.size} af ${total} markeret — ${bytes.toLocaleString('da-DK')} byte`
-      : `${total} elementer${this.filter ? ` (filter: ${this.filter})` : ''}`;
+      ? `${this.marked.size} of ${total} selected — ${bytes.toLocaleString('en-US')} bytes`
+      : `${total} item${total === 1 ? '' : 's'}${this.filter ? ` (filter: ${this.filter})` : ''}`;
     const right = document.createElement('span');
     right.className = 'r';
     right.textContent = this.listing.status;

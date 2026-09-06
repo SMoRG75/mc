@@ -58,7 +58,7 @@ export class UssProvider implements PaneProvider {
             sortKey: `${isDirectory ? '0' : '1'}${item.name.toLowerCase()}`,
             cells: {
               name: item.name,
-              size: isDirectory ? '<DIR>' : (item.size ?? 0).toLocaleString('da-DK'),
+              size: isDirectory ? '<DIR>' : (item.size ?? 0).toLocaleString('en-US'),
               mtime: item.mtime ?? '',
               mode: item.mode ?? '',
               user: item.user ?? String(item.uid ?? ''),
@@ -71,7 +71,7 @@ export class UssProvider implements PaneProvider {
       title: dir,
       columns: COLUMNS,
       entries,
-      status: `${(bytes / 1024 / 1024).toFixed(1)} MB i katalog`,
+      status: `${(bytes / 1024 / 1024).toFixed(1)} MB in directory`,
       truncated: items.length > limit,
     };
   }

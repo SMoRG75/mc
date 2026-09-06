@@ -44,7 +44,7 @@ export interface SourceItem {
 export interface PaneProvider {
   readonly kind: PaneKind;
 
-  /** Human-readable label for the pane header, e.g. `LPAR1` or `Denne PC`. */
+  /** Human-readable label for the pane header, e.g. `LPAR1` or `This PC`. */
   label(loc: PaneLocation): string;
 
   capabilities(loc: PaneLocation): Capabilities;
