@@ -367,15 +367,36 @@ export class CommanderPanel {
   }
 
   private async compare(leftEntryId: string, rightEntryId: string): Promise<void> {
-    const left = EditorBridge.uri(
-      this.panes.left.location, leftEntryId,
-      this.entry('left', leftEntryId).dto.name, 'view',
+    const left = this.compareSide('left', leftEntryId);
+    const right = this.compareSide('right', rightEntryId);
+    await vscode.commands.executeCommand(
+      'vscode.diff', left.uri, right.uri, `${left.label} ↔ ${right.label}`,
     );
-    const right = EditorBridge.uri(
-      this.panes.right.location, rightEntryId,
-      this.entry('right', rightEntryId).dto.name, 'view',
-    );
-    await vscode.commands.executeCommand('vscode.diff', left, right, 'Mainframe Commander: compare');
+  }
+
+  /**
+   * One half of the diff.
+   *
+   * A local file is diffed as the file it is rather than through the bridge:
+   * `file:` gives VS Code the real document, so the diff is editable and does
+   * not cost a listing of the whole directory just to find one row again.
+   */
+  private compareSide(pane: PaneId, entryId: string): { uri: vscode.Uri; label: string } {
+    const location = this.panes[pane].location;
+    const provider = this.provider(pane);
+    const entry = this.entry(pane, entryId);
+    if (entry.dto.kind === 'dir') {
+      throw new UserFacingError(
+        `'${entry.dto.name}' is a folder — F10 compares two files.`,
+      );
+    }
+    const name = provider.describe(location, entry).name;
+    return {
+      uri: location.kind === 'local'
+        ? vscode.Uri.file(entryId)
+        : EditorBridge.uri(location, entryId, name, 'view'),
+      label: `${provider.label(location)}: ${name}`,
+    };
   }
 
   /**

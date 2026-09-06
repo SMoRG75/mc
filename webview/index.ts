@@ -1,5 +1,5 @@
 import type {
-  HostMessage, PaneId, PaneLocation, ProfileDto, TransferJobDto, TransferOptions,
+  EntryDto, HostMessage, PaneId, PaneLocation, ProfileDto, TransferJobDto, TransferOptions,
 } from '../src/shared/protocol';
 import { Pane } from './pane';
 import { Dispatcher, type Action } from './keymap';
@@ -129,7 +129,11 @@ class App {
         this.panes[message.pane].setBusy(message.busy);
         break;
       case 'error':
-        if (message.pane) this.panes[message.pane].setError(message.message, message.detail);
+        // A message with no pane comes from something that spans both — compare,
+        // a cancelled transfer. Dropping those was how F10 could fail in silence;
+        // the active pane is where the user pressed the key, so it is where the
+        // answer belongs.
+        this.panes[message.pane ?? this.active].setError(message.message, message.detail);
         break;
       case 'transfers':
         this.renderTransfers(message.jobs);
@@ -285,11 +289,14 @@ class App {
       }
 
       case 'compare': {
+        // F10 is the one key that reads both panes at once, so it is also the
+        // one that can find nothing to do in the pane the user is not looking
+        // at. Saying which side is wrong beats doing nothing.
         const left = this.panes.left.cursorEntry;
         const right = this.panes.right.cursorEntry;
-        if (left && right && left.kind !== 'up' && right.kind !== 'up') {
-          send({ type: 'compare', leftEntryId: left.id, rightEntryId: right.id });
-        }
+        const refusal = uncomparable(left, 'left') ?? uncomparable(right, 'right');
+        if (refusal) return pane.setError(refusal);
+        send({ type: 'compare', leftEntryId: left!.id, rightEntryId: right!.id });
         return;
       }
 
@@ -358,6 +365,17 @@ class App {
     const profile = location.profile || (location.kind === 'local' ? 'local' : 'default');
     this.promptLabel.textContent = `${profile}:${location.path || '/'}>`;
   }
+}
+
+/** Why F10 cannot use this row, or undefined when it can. */
+function uncomparable(entry: EntryDto | undefined, side: 'left' | 'right'): string | undefined {
+  if (!entry || entry.kind === 'up') {
+    return `F10 compares the row the cursor is on in each pane — the ${side} one is on '..'.`;
+  }
+  if (entry.kind === 'dir') {
+    return `'${entry.name}' in the ${side} pane is a folder. F10 compares two files.`;
+  }
+  return undefined;
 }
 
 /** Same rule as the provider's: a wildcard or an empty path is a filter. */
