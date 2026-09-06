@@ -24,7 +24,7 @@ class App {
   private profiles: ProfileDto[] = [];
   private filterMode = false;
   private filterText = '';
-  private pendingCursor: Partial<Record<PaneId, string>> = {};
+  private pendingCursor: Partial<Record<PaneId, { location: PaneLocation; entryId: string }>> = {};
   private cursorTimer = 0;
 
   private readonly commandInput = document.createElement('input');
@@ -84,11 +84,15 @@ class App {
    * message per keypress, and only the last one is worth anything.
    */
   private rememberCursor(pane: PaneId, entryId: string): void {
-    this.pendingCursor[pane] = entryId;
+    // The location is captured now, not when the timer fires: by then the pane
+    // may have moved on, and the row belongs to the listing it was read in.
+    const location = this.panes[pane].location;
+    if (!location) return;
+    this.pendingCursor[pane] = { location, entryId };
     window.clearTimeout(this.cursorTimer);
     this.cursorTimer = window.setTimeout(() => {
-      for (const [target, id] of Object.entries(this.pendingCursor)) {
-        send({ type: 'cursor', pane: target as PaneId, entryId: id });
+      for (const [target, pending] of Object.entries(this.pendingCursor)) {
+        if (pending) send({ type: 'cursor', pane: target as PaneId, ...pending });
       }
       this.pendingCursor = {};
     }, 400);

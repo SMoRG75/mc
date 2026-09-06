@@ -5,6 +5,7 @@ import type {
 import type { Entry, PaneProvider, ProviderRegistry } from './core/provider';
 import { TransferQueue, type TransferRequest } from './core/transferQueue';
 import { EditorBridge, type OpenMode } from './core/editorBridge';
+import { CursorHistory } from './core/cursorHistory';
 import { describeError, UserFacingError } from './core/errors';
 import { asRememberedPanes, sameLocation, settings, type RememberedPanes } from './core/settings';
 import type { SessionManager } from './zowe/sessions';
@@ -23,12 +24,17 @@ const REMEMBERED_PANES = 'panes.last';
 interface PaneState {
   location: PaneLocation;
   entries: Entry[];
-  /** The row the cursor is on, as the webview last reported it. */
+  /** The row the cursor is on in `location`, as the webview last reported it. */
   cursor?: string;
   /**
+   * Where the cursor was in each location this pane has visited, so stepping
+   * into a PDS and back out lands on the member you came from, not at the top.
+   */
+  history: CursorHistory;
+  /**
    * A remembered cursor waiting to be handed back, cleared once it has been.
-   * Only the first listing carries one: after that the pane owns its own cursor
-   * and a second opinion from here would fight with it.
+   * Set only when the pane moves: a plain refresh must not carry one, or
+   * Ctrl+R would yank the cursor back from wherever the user had moved it.
    */
   restore?: string;
   /** Cancels the in-flight listing when the user navigates away from it. */
@@ -96,7 +102,11 @@ export class CommanderPanel {
       // somewhere else entirely and starting on it would be nonsense.
       const saved = remembered?.[pane];
       const cursor = saved && sameLocation(saved.location, location) ? saved.cursor : undefined;
-      return { location, entries: [], cursor, restore: cursor };
+      const history = new CursorHistory();
+      // Seeded, so navigating away from the restored location and back returns
+      // to the same row rather than only working from the second visit on.
+      if (cursor) history.remember(location, cursor);
+      return { location, entries: [], cursor, restore: cursor, history };
     };
     this.panes = { left: restore('left'), right: restore('right') };
 
@@ -146,7 +156,7 @@ export class CommanderPanel {
           break;
 
         case 'navigate':
-          this.panes[msg.pane].location = msg.location;
+          this.goTo(msg.pane, msg.location);
           await this.refresh(msg.pane);
           break;
 
@@ -154,7 +164,7 @@ export class CommanderPanel {
           const state = this.panes[msg.pane];
           const parent = this.provider(msg.pane).parent(state.location);
           if (parent) {
-            state.location = parent;
+            this.goTo(msg.pane, parent);
             await this.refresh(msg.pane);
           }
           break;
@@ -165,7 +175,11 @@ export class CommanderPanel {
           const entry = this.entry(msg.pane, msg.entryId);
           const next = this.provider(msg.pane).enter(state.location, entry);
           if (next) {
-            state.location = next;
+            // The row being entered is where the cursor belongs when the user
+            // comes back up, and it is known here and now — the webview's own
+            // report is on a timer this navigation is about to invalidate.
+            this.rememberCursorAt(msg.pane, state.location, msg.entryId);
+            this.goTo(msg.pane, next);
             await this.refresh(msg.pane);
           } else {
             await this.openInEditor(msg.pane, msg.entryId, 'edit');
@@ -223,8 +237,7 @@ export class CommanderPanel {
           break;
 
         case 'cursor':
-          this.panes[msg.pane].cursor = msg.entryId;
-          this.rememberPanes();
+          this.rememberCursorAt(msg.pane, msg.location, msg.entryId);
           break;
 
         case 'cancelTransfer':
@@ -292,6 +305,34 @@ export class CommanderPanel {
    * as we go also means a path that failed to list is not what you come back
    * to — only somewhere that actually worked is worth reopening on.
    */
+  /**
+   * Points a pane somewhere else, bringing back the row the cursor was on there
+   * last time. Every location change goes through here — that is what makes the
+   * history complete rather than a special case for Backspace.
+   */
+  private goTo(pane: PaneId, location: PaneLocation): void {
+    const state = this.panes[pane];
+    state.location = location;
+    state.restore = state.history.recall(location);
+    state.cursor = state.restore;
+  }
+
+  /**
+   * Files a cursor position under the listing it was read in.
+   *
+   * `location` is the message's, not the pane's: a debounced report can arrive
+   * after the pane has moved on, and it still says something true about where
+   * it came from.
+   */
+  private rememberCursorAt(pane: PaneId, location: PaneLocation, entryId: string): void {
+    const state = this.panes[pane];
+    state.history.remember(location, entryId);
+    if (sameLocation(location, state.location)) {
+      state.cursor = entryId;
+      this.rememberPanes();
+    }
+  }
+
   private rememberPanes(): void {
     const state: RememberedPanes = {
       left: { location: this.panes.left.location, cursor: this.panes.left.cursor },
@@ -418,9 +459,7 @@ export class CommanderPanel {
     void vscode.window.showInformationMessage(`Submitted: ${ids.join(', ')}`);
 
     // Point the other pane at the job queue so the result is one glance away.
-    this.panes[other].location = {
-      kind: 'jes', profile: this.panes[pane].location.profile, path: '',
-    };
+    this.goTo(other, { kind: 'jes', profile: this.panes[pane].location.profile, path: '' });
     await this.refresh(other);
   }
 
@@ -470,9 +509,9 @@ export class CommanderPanel {
       case 'cd': {
         const provider = this.provider(pane);
         const from = this.panes[pane].location;
-        this.panes[pane].location = provider.resolve
+        this.goTo(pane, provider.resolve
           ? provider.resolve(from, argument)
-          : { ...from, path: argument };
+          : { ...from, path: argument });
         await this.refresh(pane);
         return;
       }
@@ -543,6 +582,7 @@ export class CommanderPanel {
 </html>`;
   }
 }
+
 
 /** `*` keeps the source name; anything else is used verbatim. */
 function applyPattern(pattern: string, sourceName: string): string {

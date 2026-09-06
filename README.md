@@ -29,6 +29,8 @@ src/
 │  └─ protocol.ts          The message contract between host and webview — imported by both
 ├─ core/
 │  ├─ provider.ts          The PaneProvider interface + registry
+│  ├─ cursorHistory.ts     Which row the cursor was on, per listing
+│  ├─ ebcdic.ts            Local EBCDIC decoding for Shift+F3
 │  ├─ transferQueue.ts     Background queue for F5/F6 with concurrency and cancellation
 │  ├─ editorBridge.ts      FileSystemProvider, so F3/F4 open in a real editor
 │  ├─ text.ts              Text/binary choice and LRECL fitting
@@ -88,7 +90,9 @@ special case, just `source.read()` followed by `target.write()`.
 - **The panes reopen where you left them.** `mc.panes.*` says where a pane
   *starts*; after that the position that last listed successfully is what comes
   back, so the PDS or USS directory you were working in — which LPAR it was on,
-  and the row the cursor was on — survives closing VS Code. It is kept in the extension's own storage
+  and the row the cursor was on — survives closing VS Code. Within a session
+  every listing keeps its own cursor, so stepping into a PDS and back out lands
+  on the member you came from rather than at the top. It is kept in the extension's own storage
   rather than written back into `mc.panes.*`, because it changes on every
   navigation and that settings file is often under git. The setting still wins
   whenever it has been edited since: the position is remembered together with

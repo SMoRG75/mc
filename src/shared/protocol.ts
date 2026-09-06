@@ -191,7 +191,11 @@ export type ClientMessage =
   | { type: 'create'; pane: PaneId; name: string; dataset?: DatasetSpec }
   | { type: 'submit'; pane: PaneId; entryIds: string[] }
   | { type: 'compare'; leftEntryId: string; rightEntryId: string }
-  /** Which row the cursor is on, so the next session can start there. Debounced. */
-  | { type: 'cursor'; pane: PaneId; entryId: string }
+  /**
+   * Which row the cursor is on. Debounced, so it carries the location it was
+   * read in: by the time it arrives the pane may already be somewhere else, and
+   * filing the row under the wrong listing is worse than not filing it at all.
+   */
+  | { type: 'cursor'; pane: PaneId; location: PaneLocation; entryId: string }
   | { type: 'cancelTransfer'; id: string }
   | { type: 'commandLine'; pane: PaneId; line: string };
