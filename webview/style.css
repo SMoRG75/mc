@@ -119,6 +119,8 @@ html, body {
 .cell.right { text-align: right; }
 
 .rows-viewport { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
+/* The list holds focus so keys land; the cursor row is what shows it. */
+.rows-viewport:focus, .rows-viewport:focus-visible { outline: none; }
 .rows-spacer { position: relative; }
 .rows { position: absolute; top: 0; left: 0; right: 0; will-change: transform; }
 

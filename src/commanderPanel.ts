@@ -40,7 +40,10 @@ export class CommanderPanel {
     sessions: SessionManager,
   ): CommanderPanel {
     if (CommanderPanel.current) {
-      CommanderPanel.current.panel.reveal();
+      // preserveFocus: false — reopening the command should hand the keyboard
+      // back to the panes, not leave it wherever it was.
+      CommanderPanel.current.panel.reveal(undefined, false);
+      CommanderPanel.current.post({ type: 'focus' });
       return CommanderPanel.current;
     }
     const panel = vscode.window.createWebviewPanel(
@@ -80,6 +83,11 @@ export class CommanderPanel {
     panel.webview.html = this.html();
     this.disposables.push(
       panel.webview.onDidReceiveMessage((msg: ClientMessage) => void this.handle(msg)),
+      // Tabbing back to the panel focuses the iframe but nothing in it; the
+      // webview needs the nudge to put focus on the active pane again.
+      panel.onDidChangeViewState(() => {
+        if (panel.active) this.post({ type: 'focus' });
+      }),
       panel.onDidDispose(() => this.dispose()),
     );
     this.scheduleJesRefresh();
@@ -106,6 +114,7 @@ export class CommanderPanel {
             profiles: await this.sessions.profiles().catch(() => []),
             defaults: settings.transferDefaults(),
           });
+          this.post({ type: 'focus' });
           await Promise.all([this.refresh('left'), this.refresh('right')]);
           break;
 

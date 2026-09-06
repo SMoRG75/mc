@@ -107,7 +107,13 @@ export type HostMessage =
   | { type: 'transfers'; jobs: TransferJobDto[] }
   | { type: 'profiles'; profiles: ProfileDto[] }
   /** A key VS Code would otherwise have swallowed (F5 starts the debugger). */
-  | { type: 'key'; key: string };
+  | { type: 'key'; key: string }
+  /**
+   * The panel became the active editor. VS Code focuses the webview's iframe,
+   * but nothing inside it, so the webview has to put the caret somewhere itself
+   * or the first keypress goes nowhere and the user has to click.
+   */
+  | { type: 'focus' };
 
 /* ------------------------------------------------------------------ */
 /* webview -> extension host                                           */

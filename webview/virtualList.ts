@@ -25,6 +25,9 @@ export class VirtualList {
     private readonly onCursor: (index: number) => void,
   ) {
     this.viewport.className = 'rows-viewport';
+    // Focusable, but not in the tab order: the panes are driven by the keymap,
+    // and something in the document must hold focus or keydown never fires.
+    this.viewport.tabIndex = -1;
     this.spacer.className = 'rows-spacer';
     this.rows.className = 'rows';
     this.spacer.append(this.rows);
@@ -46,6 +49,10 @@ export class VirtualList {
 
   get element(): HTMLElement {
     return this.viewport;
+  }
+
+  focus(): void {
+    this.viewport.focus({ preventScroll: true });
   }
 
   setData(columns: ColumnDef[], entries: EntryDto[]): void {

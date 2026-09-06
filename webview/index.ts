@@ -46,6 +46,11 @@ class App {
       this.dispatcher.fromEvent(event);
     });
     window.addEventListener('message', (event: MessageEvent<HostMessage>) => this.receive(event.data));
+    // VS Code focuses the webview's iframe when the panel opens or is tabbed
+    // back to, but leaves the focus inside it on <body> — where keydown does
+    // fire, but a click is still needed after any dialog or editor took it.
+    window.addEventListener('focus', () => this.focusActivePane());
+    this.focusActivePane();
     send({ type: 'ready' });
   }
 
@@ -120,6 +125,9 @@ class App {
         break;
       case 'key':
         this.dispatcher.fromHost(message.key);
+        break;
+      case 'focus':
+        this.focusActivePane();
         break;
     }
   }
@@ -288,6 +296,18 @@ class App {
     this.panes.left.setActive(pane === 'left');
     this.panes.right.setActive(pane === 'right');
     this.updatePrompt();
+    this.focusActivePane();
+  }
+
+  /**
+   * Hands the keyboard to the active pane — unless the user is already typing
+   * somewhere on purpose, in which case taking focus would be the bug.
+   */
+  private focusActivePane(): void {
+    const active = document.activeElement;
+    if (active === this.commandInput) return;
+    if (active instanceof HTMLElement && active.closest('.modal')) return;
+    this.panes[this.active].focus();
   }
 
   private updatePrompt(): void {

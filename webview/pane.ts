@@ -63,6 +63,11 @@ export class Pane {
     this.element.classList.toggle('inactive', !active);
   }
 
+  /** Puts the keyboard in this pane's row list. */
+  focus(): void {
+    this.list.focus();
+  }
+
   setProfiles(profiles: ProfileDto[]): void {
     this.profileSelect.replaceChildren(
       ...profiles.map((profile) => {
