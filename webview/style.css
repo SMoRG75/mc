@@ -59,6 +59,11 @@ html, body {
   font-size: 11.5px;
 }
 .pill.hidden { visibility: hidden; }
+/* The native popup list does not inherit the control's own colours. */
+option {
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+}
 
 .seg { display: flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
 .seg span {

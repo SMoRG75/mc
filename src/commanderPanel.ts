@@ -113,6 +113,7 @@ export class CommanderPanel {
             panes: { left: this.panes.left.location, right: this.panes.right.location },
             profiles: await this.sessions.profiles().catch(() => []),
             defaults: settings.transferDefaults(),
+            codepages: settings.codepages(),
           });
           this.post({ type: 'focus' });
           await Promise.all([this.refresh('left'), this.refresh('right')]);
@@ -278,6 +279,17 @@ export class CommanderPanel {
     if (!target.capabilities(targetLoc).write) {
       throw new Error(`Cannot write to ${target.label(targetLoc)}.`);
     }
+
+    // The codepage the user picked becomes the default for next time. Failing to
+    // save a preference is worth saying out loud, but never worth stopping the
+    // transfer that is already under way.
+    settings.rememberCodepage(options.codepage).catch((err: unknown) => {
+      const { message } = describeError(err);
+      this.post({
+        type: 'error', pane: from,
+        message: `The codepage ${options.codepage} could not be saved as the default: ${message}`,
+      });
+    });
 
     const requests: TransferRequest[] = [];
     for (const id of entryIds) {

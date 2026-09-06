@@ -91,7 +91,8 @@ export function confirm(title: string, detail: string): Promise<boolean | undefi
  * until much later.
  */
 export function transferDialog(
-  defaults: TransferOptions, count: number, targetLabel: string, targetPath: string,
+  defaults: TransferOptions, codepages: string[], count: number,
+  targetLabel: string, targetPath: string,
 ): Promise<TransferOptions | undefined> {
   return modal<TransferOptions>((resolve) => {
     const box = document.createElement('form');
@@ -105,7 +106,8 @@ export function transferDialog(
         ], defaults.mode)}</div>
         <p class="hint">Text converts line endings and character set; binary sends byte for byte.</p>
         <label class="row"><span>Codepage</span>
-          <input class="field short" name="codepage" spellcheck="false"></label>
+          <select class="field" name="codepage">${codepageOptions(codepages, defaults.codepage)}</select></label>
+        <p class="hint">Kept as the default for next time. The list itself is the <code>mc.transfer.codepages</code> setting.</p>
         <div class="row"><span>Long lines</span>${radios('longLines', [
           ['wrap', 'Wrap'], ['truncate', 'Truncate'], ['abort', 'Abort'],
         ], defaults.longLines)}</div>
@@ -121,7 +123,6 @@ export function transferDialog(
     const form = box as HTMLFormElement;
     (form.elements.namedItem('destination') as HTMLInputElement).value =
       targetPath ? `${targetPath}(*)` : defaults.destination;
-    (form.elements.namedItem('codepage') as HTMLInputElement).value = defaults.codepage;
 
     box.querySelector('[data-cancel]')?.addEventListener('click', () => resolve(undefined));
     form.addEventListener('submit', (event) => {
@@ -301,6 +302,51 @@ function number(value: FormDataEntryValue | null, fallback: number): number {
 function text(value: FormDataEntryValue | null): string | undefined {
   return String(value ?? '').trim() || undefined;
 }
+
+/**
+ * The codepage picker.
+ *
+ * The countries are the whole point: `IBM-278` says nothing, "Finland, Sweden"
+ * says everything. A codepage the list below does not know still shows up — the
+ * offered set is a setting, and an installation may well have its own.
+ */
+function codepageOptions(codepages: string[], selected: string): string {
+  return codepages.map((code) => {
+    const country = COUNTRIES[code];
+    const label = country ? `${code} — ${country}` : code;
+    return `<option value="${escapeHtml(code)}"${code === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+  }).join('');
+}
+
+/** The EBCDIC pages by the country that uses them; euro variants marked. */
+const COUNTRIES: Record<string, string> = {
+  'IBM-037': 'US, Canada, Netherlands, Brazil',
+  'IBM-273': 'Germany, Austria',
+  'IBM-277': 'Denmark, Norway',
+  'IBM-278': 'Finland, Sweden',
+  'IBM-280': 'Italy',
+  'IBM-284': 'Spain, Latin America',
+  'IBM-285': 'United Kingdom',
+  'IBM-297': 'France',
+  'IBM-500': 'International (Latin-1)',
+  'IBM-870': 'Central Europe (Latin-2)',
+  'IBM-871': 'Iceland',
+  'IBM-1025': 'Cyrillic',
+  'IBM-1026': 'Turkey',
+  'IBM-1047': 'Latin-1 Open Systems (USS)',
+  'IBM-1140': 'US, Canada, Netherlands, Brazil · euro',
+  'IBM-1141': 'Germany, Austria · euro',
+  'IBM-1142': 'Denmark, Norway · euro',
+  'IBM-1143': 'Finland, Sweden · euro',
+  'IBM-1144': 'Italy · euro',
+  'IBM-1145': 'Spain, Latin America · euro',
+  'IBM-1146': 'United Kingdom · euro',
+  'IBM-1147': 'France · euro',
+  'IBM-1148': 'International · euro',
+  'IBM-1149': 'Iceland · euro',
+  'ISO8859-1': 'ASCII, Latin-1',
+  'UTF-8': 'Unicode',
+};
 
 function radios(name: string, options: [string, string][], selected: string): string {
   return `<span class="radio">${options.map(([value, label]) => `

@@ -102,12 +102,15 @@ export class UssProvider implements PaneProvider {
     return { name: basename(ref.path), size: entry.dto.size, text: false };
   }
 
-  async read(loc: PaneLocation, entry: Entry): Promise<Buffer> {
+  async read(loc: PaneLocation, entry: Entry, transfer: TransferOptions): Promise<Buffer> {
     const session = await this.sessions.session(loc.profile);
     const ref = entry.ref as UssRef;
-    // The file's own tag knows better than any default we could pick.
-    const options: { binary?: boolean; encoding?: string } = {};
+    // The file's own tag knows better than any default we could pick — but an
+    // untagged file has to be read as something, and the configured codepage is
+    // a far better guess than the service default.
+    const options: { binary?: boolean; encoding?: string } = { encoding: transfer.codepage };
     await Utilities.applyTaggedEncoding(session, ref.path, options).catch(() => undefined);
+    if (options.binary) delete options.encoding;
     return Get.USSFile(session, ref.path, options);
   }
 

@@ -143,7 +143,14 @@ export interface ProfileDto {
 /* ------------------------------------------------------------------ */
 
 export type HostMessage =
-  | { type: 'init'; panes: Record<PaneId, PaneLocation>; profiles: ProfileDto[]; defaults: TransferOptions }
+  | {
+    type: 'init';
+    panes: Record<PaneId, PaneLocation>;
+    profiles: ProfileDto[];
+    defaults: TransferOptions;
+    /** What the codepage picker in the F5 dialog offers. */
+    codepages: string[];
+  }
   | { type: 'listing'; pane: PaneId; listing: ListingDto }
   | { type: 'busy'; pane: PaneId; busy: boolean }
   | { type: 'error'; pane: PaneId | null; message: string; detail?: string }

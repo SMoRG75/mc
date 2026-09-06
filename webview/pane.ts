@@ -20,6 +20,7 @@ export class Pane {
   private readonly columnsRow: HTMLElement;
 
   private listing?: ListingDto;
+  private profiles: ProfileDto[] = [];
   private readonly marked = new Set<string>();
   private filter = '';
   /** Filtered and sorted rows, recomputed only when the data or filter changes. */
@@ -78,6 +79,7 @@ export class Pane {
   }
 
   setProfiles(profiles: ProfileDto[]): void {
+    this.profiles = profiles;
     this.profileSelect.replaceChildren(
       ...profiles.map((profile) => {
         const option = document.createElement('option');
@@ -86,6 +88,30 @@ export class Pane {
         return option;
       }),
     );
+    if (profiles.length === 0) {
+      this.profileSelect.append(placeholder('(no profiles)'));
+    }
+    // The profile list and the listing arrive in either order.
+    this.showProfile(this.listing?.location.profile ?? '');
+  }
+
+  /**
+   * Shows which profile the pane is on.
+   *
+   * An empty profile means "the default one" — the location says nothing, and no
+   * option carries an empty value, so assigning it straight to the select leaves
+   * the header showing an empty box. Resolve it to the default profile, and fall
+   * back to an option for the bare name when the profile list does not hold it
+   * (a renamed profile, or a listing that arrived before the list did).
+   */
+  private showProfile(profile: string): void {
+    const name = profile || this.profiles.find((p) => p.isDefault)?.name || this.profiles[0]?.name || '';
+    // Against the options rather than the profile list: every refresh comes
+    // through here, and the placeholder must not be added a second time.
+    if (name && ![...this.profileSelect.options].some((o) => o.value === name)) {
+      this.profileSelect.append(placeholder(name, name));
+    }
+    this.profileSelect.value = name;
   }
 
   setBusy(busy: boolean): void {
@@ -104,7 +130,7 @@ export class Pane {
     this.listing = listing;
     this.marked.clear();
     this.filter = '';
-    this.profileSelect.value = listing.location.profile;
+    this.showProfile(listing.location.profile);
     this.profileSelect.classList.toggle('hidden', listing.location.kind === 'local');
     this.renderKindTabs(listing.location.kind);
     this.renderViewTabs(listing.views ?? []);
@@ -272,6 +298,14 @@ export class Pane {
     const base = this.listing?.location ?? { kind: 'local' as PaneKind, profile: '', path: '' };
     this.callbacks.navigate({ ...base, ...patch });
   }
+}
+
+/** An option that stands in for something the profile list does not have. */
+function placeholder(label: string, value = ''): HTMLOptionElement {
+  const option = document.createElement('option');
+  option.value = value;
+  option.textContent = label;
+  return option;
 }
 
 function errorSpan(message: string, detail?: string): HTMLElement {

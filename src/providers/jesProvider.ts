@@ -1,7 +1,9 @@
 import { DeleteJobs, GetJobs, SubmitJobs } from '@zowe/zos-jobs-for-zowe-sdk';
 import type { IJob } from '@zowe/zos-jobs-for-zowe-sdk';
 import type { AbstractSession } from '@zowe/imperative';
-import type { Capabilities, ColumnDef, PaneLocation, ViewDto } from '../shared/protocol';
+import type {
+  Capabilities, ColumnDef, PaneLocation, TransferOptions, ViewDto,
+} from '../shared/protocol';
 import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
 import type { SessionManager } from '../zowe/sessions';
 import { UserFacingError } from '../core/errors';
@@ -177,11 +179,13 @@ export class JesProvider implements PaneProvider {
       : { name: `${ref.jobid}.jcl`, text: true };
   }
 
-  async read(loc: PaneLocation, entry: Entry): Promise<Buffer> {
+  async read(loc: PaneLocation, entry: Entry, options: TransferOptions): Promise<Buffer> {
     const session = await this.sessions.session(loc.profile);
     const ref = entry.ref as JesRef;
+    // Spool output is EBCDIC like everything else; the JCL endpoint takes no
+    // encoding, so that one stays on the service default.
     const content = ref.kind === 'spool'
-      ? await GetJobs.getSpoolContentById(session, ref.jobname, ref.jobid, ref.spoolId)
+      ? await GetJobs.getSpoolContentById(session, ref.jobname, ref.jobid, ref.spoolId, options.codepage)
       : await GetJobs.getJcl(session, ref.jobname, ref.jobid);
     return Buffer.from(String(content), 'utf8');
   }

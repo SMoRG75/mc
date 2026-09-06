@@ -76,7 +76,7 @@ export class TransferQueue {
 
   private async run(job: Job): Promise<void> {
     try {
-      const data = await job.source.read(job.sourceLoc, job.entry, job.abort.signal);
+      const data = await job.source.read(job.sourceLoc, job.entry, job.options, job.abort.signal);
       job.progress = 0.5;
       this.publish();
       await job.target.write(job.targetLoc, job.name, data, job.options, job.abort.signal);

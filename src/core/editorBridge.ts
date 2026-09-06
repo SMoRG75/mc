@@ -81,7 +81,11 @@ export class EditorBridge implements vscode.FileSystemProvider {
       const listing = await provider.list(target.location, new AbortController().signal);
       const entry = listing.entries.find((e) => e.dto.id === target.entryId);
       if (!entry) throw vscode.FileSystemError.FileNotFound(uri);
-      return await provider.read(target.location, entry, new AbortController().signal);
+      // Same options as a save and as F5: the codepage a file is read with has
+      // to be the one it is written back with.
+      return await provider.read(
+        target.location, entry, this.transferDefaults(), new AbortController().signal,
+      );
     } catch (err) {
       throw toFileSystemError(err, uri);
     }

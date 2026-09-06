@@ -216,9 +216,20 @@ export class DsProvider implements PaneProvider {
     return { name: ref.kind === 'member' ? ref.member : ref.dsname, size: entry.dto.size, text: true };
   }
 
-  async read(loc: PaneLocation, entry: Entry): Promise<Buffer> {
+  /**
+   * `fileEncoding` on the way out says which EBCDIC page the records are in, so
+   * z/OSMF hands back UTF-8 with the national characters intact. Without it the
+   * conversion falls back to whatever the service defaults to, which turns æøå
+   * into something else entirely.
+   */
+  async read(loc: PaneLocation, entry: Entry, options: TransferOptions): Promise<Buffer> {
     const session = await this.sessions.session(loc.profile);
-    return Get.dataSet(session, qualify(entry.ref as DsRef));
+    const ref = entry.ref as DsRef;
+    const mode = resolveMode(options, this.describe(loc, entry).name, this.settings.binaryExtensions());
+    return Get.dataSet(
+      session, qualify(ref),
+      mode === 'binary' ? { binary: true } : { encoding: options.codepage },
+    );
   }
 
   async write(

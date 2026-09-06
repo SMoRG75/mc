@@ -72,8 +72,16 @@ export interface PaneProvider {
   /** Describes the entry for transfer purposes. */
   describe(loc: PaneLocation, entry: Entry): SourceItem;
 
-  /** Reads an entry whole. Large files should go through `readStream` instead. */
-  read(loc: PaneLocation, entry: Entry, signal: AbortSignal): Promise<Buffer>;
+  /**
+   * Reads an entry whole. Large files should go through `readStream` instead.
+   *
+   * `options` carries the codepage the host content has to be converted from —
+   * the same one F5 writes with, so viewing, editing and copying cannot end up
+   * disagreeing about what a national character means.
+   */
+  read(
+    loc: PaneLocation, entry: Entry, options: TransferOptions, signal: AbortSignal,
+  ): Promise<Buffer>;
 
   /** Writes `data` into `loc` under `name`, creating or replacing it. */
   write(

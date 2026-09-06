@@ -15,8 +15,9 @@ class App {
   private readonly panes: Record<PaneId, Pane>;
   private active: PaneId = 'left';
   private defaults: TransferOptions = {
-    mode: 'auto', codepage: 'IBM-1140', longLines: 'abort', onConflict: 'ask', destination: '*',
+    mode: 'auto', codepage: 'IBM-277', longLines: 'abort', onConflict: 'ask', destination: '*',
   };
+  private codepages: string[] = [];
   private profiles: ProfileDto[] = [];
   private filterMode = false;
   private filterText = '';
@@ -108,6 +109,7 @@ class App {
     switch (message.type) {
       case 'init':
         this.defaults = message.defaults;
+        this.codepages = message.codepages;
         this.profiles = message.profiles;
         for (const pane of ['left', 'right'] as PaneId[]) this.panes[pane].setProfiles(this.profiles);
         break;
@@ -219,10 +221,13 @@ class App {
         const options = action === 'copyNoDialog'
           ? this.defaults
           : await transferDialog(
-            this.defaults, ids.length,
+            this.defaults, this.codepages, ids.length,
             target?.profile || 'local disk', target?.kind === 'ds' ? target.path : '',
           );
         if (!options) return;
+        // The host writes the pick to the settings; holding on to it here keeps
+        // the next dialog in this session showing the same choice.
+        this.defaults = { ...this.defaults, codepage: options.codepage };
         return send({ type: 'copy', from: this.active, entryIds: ids, options });
       }
 

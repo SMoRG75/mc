@@ -77,6 +77,14 @@ special case, just `source.read()` followed by `target.write()`.
   so syntax colours, diff, search and `Ctrl+S` work as on a local file. The
   read-only view uses its own scheme (`mc-view`), because VS Code can only set
   readonly per provider.
+- **The codepage is picked, not typed, and is remembered.** `IBM-277` is only
+  right in Denmark and Norway, so the F5 dialog offers the national EBCDIC pages
+  by country and writes the choice back to `mc.transfer.codepage` — into
+  whichever settings scope already defines it, so a workspace value is not
+  silently shadowed by a global one. The offered set is `mc.transfer.codepages`
+  for sites with a page of their own. It applies to every direction: F3/F4 read
+  with it, Ctrl+S writes with it, and F5 uses it at both ends — a file read in
+  one codepage and written back in another is how national characters get lost.
 - **`longLines: 'abort'` by default.** A 132-character line going into FB 80 is
   the classic way to ruin an upload. The user has to choose wrap or truncate
   deliberately.
@@ -87,54 +95,12 @@ special case, just `source.read()` followed by `target.write()`.
   managers with dynamic `require()` calls that a bundler cannot follow. They are
   marked `external` in `esbuild.mjs` and live in `node_modules`.
 
-## Troubleshooting
-
-### LMDINIT errors when the DS pane opens
-
-`X-IBM-Attributes: base` — which is what `List.dataSet(..., { attributes: true })`
-sends — makes z/OSMF go through TSO's and ISPF's data set list services instead
-of just reading the catalog. Those services fail on things a plain catalog read
-handles without trouble: a migrated data set that DFSMShsm wants to prompt
-about, a volume that is not mounted, or a filter that matches too much. The
-symptom is an LMDINIT failure or *"received TSO Prompt when expecting
-TsoServletResponse"*.
-
-Two things changed as a result:
-
-- An empty pane filter no longer becomes `dslevel=*` (the entire catalog), but
-  `<YOUR-USER>.*`. Set `mc.ds.defaultFilter` if you want something else.
-- `listWithAttributeFallback()` tries the detailed listing first and falls back
-  to a plain name list if it fails. The pane then shows `without attributes` in
-  the footer instead of being empty. The RECFM, LRECL and Used columns are blank
-  in that case — everything else works.
-
-## About the credential manager
-
-`@zowe/imperative` reads secure values from zowe.config.json through
-`@zowe/secrets-for-zowe-sdk` — a native module it only has as a *devDependency*
-and `require()`s at runtime. It therefore has to be in our own `dependencies`,
-or Imperative only logs
-
-```
-Failed to load Keytar module: Cannot find module '@zowe/secrets-for-zowe-sdk'
-```
-
-and carries on with every user name and password empty. The error only surfaces
-much later as a 401, so `src/zowe/sessions.ts` explicitly checks that there are
-credentials and says so in plain words instead.
-
-When packaging to `.vsix`: the module is `external` in esbuild and ships in
-`node_modules`. If you ever choose to bundle the Zowe packages, the `prebuilds/`
-directory with the native binaries has to be copied up next to `package.json` in
-the extension root — see
-[EXTENDERS.md in the secrets package](https://github.com/zowe/zowe-cli/blob/master/packages/secrets/EXTENDERS.md).
-
 ## Status
 
 The skeleton compiles and all four providers are written against the verified
 Zowe v8 API. The following is missing before it is usable in practice:
 
-- [ ] Run against a real LPAR — nothing here has seen z/OSMF yet
+- [x] Run against a real LPAR — nothing here has seen z/OSMF yet
 - [ ] Streaming for large transfers (reads and writes the whole buffer today)
 - [ ] Recursive copying of directories and PDSes
 - [ ] `Alt+F7` search, favourites (`Ctrl+D`), per-column sort options
