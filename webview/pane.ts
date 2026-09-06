@@ -1,4 +1,6 @@
-import type { EntryDto, ListingDto, PaneId, PaneKind, PaneLocation, ProfileDto } from '../src/shared/protocol';
+import type {
+  EntryDto, ListingDto, PaneId, PaneKind, PaneLocation, ProfileDto, ViewDto,
+} from '../src/shared/protocol';
 import { VirtualList } from './virtualList';
 
 const KINDS: [PaneKind, string][] = [
@@ -10,6 +12,7 @@ export class Pane {
   readonly element = document.createElement('div');
   private readonly profileSelect = document.createElement('select');
   private readonly kindTabs = document.createElement('span');
+  private readonly viewTabs = document.createElement('span');
   private readonly pathBar = document.createElement('div');
   private readonly header = document.createElement('div');
   private readonly footer = document.createElement('div');
@@ -42,7 +45,8 @@ export class Pane {
     this.profileSelect.className = 'pill';
     this.profileSelect.addEventListener('change', () => this.navigate({ profile: this.profileSelect.value }));
     this.kindTabs.className = 'seg';
-    this.header.append(this.profileSelect, this.kindTabs);
+    this.viewTabs.className = 'seg views';
+    this.header.append(this.profileSelect, this.kindTabs, this.viewTabs);
 
     this.pathBar.className = 'pathbar';
     this.footer.className = 'pane-foot';
@@ -98,6 +102,7 @@ export class Pane {
     this.profileSelect.value = listing.location.profile;
     this.profileSelect.classList.toggle('hidden', listing.location.kind === 'local');
     this.renderKindTabs(listing.location.kind);
+    this.renderViewTabs(listing.views ?? []);
 
     this.pathBar.textContent = listing.title;
     if (listing.truncated) {
@@ -221,6 +226,25 @@ export class Pane {
     right.className = 'r';
     right.textContent = this.listing.status;
     this.footer.replaceChildren(left, right);
+  }
+
+  /** The location of the view after the active one — Ctrl+J cycles through them. */
+  get nextView(): PaneLocation | undefined {
+    const views = this.listing?.views ?? [];
+    if (views.length === 0) return undefined;
+    const index = views.findIndex((view) => view.active);
+    return views[(index + 1) % views.length]?.location;
+  }
+
+  private renderViewTabs(views: ViewDto[]): void {
+    this.viewTabs.classList.toggle('hidden', views.length === 0);
+    this.viewTabs.replaceChildren(...views.map((view) => {
+      const tab = document.createElement('span');
+      tab.textContent = view.label;
+      if (view.active) tab.className = 'on';
+      tab.addEventListener('click', () => this.callbacks.navigate(view.location));
+      return tab;
+    }));
   }
 
   private renderKindTabs(current: PaneKind): void {

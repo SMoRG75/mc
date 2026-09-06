@@ -1,5 +1,5 @@
 import type {
-  Capabilities, ColumnDef, EntryDto, PaneKind, PaneLocation, TransferOptions,
+  Capabilities, ColumnDef, EntryDto, PaneKind, PaneLocation, TransferOptions, ViewDto,
 } from '../shared/protocol';
 
 /**
@@ -17,6 +17,11 @@ export interface Listing {
   entries: Entry[];
   status: string;
   truncated: boolean;
+  /**
+   * Named ways of looking at the same location. Only providers that have more
+   * than one — JES and its status queues — fill this in.
+   */
+  views?: ViewDto[];
 }
 
 /** Everything a transfer needs to know about one item without re-listing it. */

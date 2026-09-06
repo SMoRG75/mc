@@ -224,6 +224,7 @@ export class CommanderPanel {
           status: listing.status,
           truncated: listing.truncated,
           capabilities: provider.capabilities(state.location),
+          views: listing.views,
         },
       });
     } catch (err) {

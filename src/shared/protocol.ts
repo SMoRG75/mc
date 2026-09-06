@@ -49,6 +49,21 @@ export interface ColumnDef {
   align?: 'left' | 'right';
 }
 
+/**
+ * A named alternative view of the same place, rendered as a segmented control
+ * in the pane header.
+ *
+ * The provider decides what its views are and where each one points, so the
+ * webview switches between them without knowing what a JES status queue is —
+ * it just navigates to the location the view carries.
+ */
+export interface ViewDto {
+  id: string;
+  label: string;
+  location: PaneLocation;
+  active: boolean;
+}
+
 export interface ListingDto {
   location: PaneLocation;
   /** What the path bar shows, e.g. `IBMUSER.PROD.JCL (PO-E · FB 80)`. */
@@ -60,6 +75,8 @@ export interface ListingDto {
   /** True when the listing hit `mc.list.pageSize`. */
   truncated: boolean;
   capabilities: Capabilities;
+  /** Empty for providers that only have one way of looking at a location. */
+  views?: ViewDto[];
 }
 
 export interface Capabilities {

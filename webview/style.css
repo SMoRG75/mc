@@ -72,6 +72,9 @@ html, body {
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
 }
+.seg.hidden { display: none; }
+/* The view bar sits to the right of the kind tabs, away from the world switch. */
+.seg.views { margin-left: auto; }
 
 .pathbar {
   padding: 3px 8px;

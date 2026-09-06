@@ -185,6 +185,11 @@ class App {
       case 'refresh': return send({ type: 'refresh', pane: this.active });
       case 'parent': return send({ type: 'up', pane: this.active });
       case 'cancel': return this.exitFilter();
+      case 'nextView': {
+        const location = pane.nextView;
+        if (location) send({ type: 'navigate', pane: this.active, location });
+        return;
+      }
       case 'quickFilter': return this.enterFilter();
       case 'focusCommandLine': return this.commandInput.focus();
 

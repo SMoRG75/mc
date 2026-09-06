@@ -12,7 +12,7 @@ export type Action =
   | 'enter' | 'parent' | 'switchPane' | 'mark' | 'markAll' | 'invertMark'
   | 'view' | 'edit' | 'copy' | 'copyNoDialog' | 'rename' | 'create'
   | 'delete' | 'submit' | 'compare' | 'refresh' | 'swapPanes' | 'focusCommandLine'
-  | 'quickFilter' | 'cancel';
+  | 'quickFilter' | 'cancel' | 'nextView';
 
 const BINDINGS: Record<string, Action> = {
   ArrowUp: 'up',
@@ -41,6 +41,7 @@ const BINDINGS: Record<string, Action> = {
   'Ctrl+a': 'markAll',
   'Ctrl+i': 'invertMark',
   'Ctrl+s': 'quickFilter',
+  'Ctrl+j': 'nextView',
   Escape: 'cancel',
 };
 

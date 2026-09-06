@@ -29,6 +29,7 @@
       { "command": "mc.key", "args": { "key": "F9" }, "key": "f9", "when": "activeWebviewPanelId == mainframeCommander" },
       { "command": "mc.key", "args": { "key": "F10" }, "key": "f10", "when": "activeWebviewPanelId == mainframeCommander" },
       { "command": "mc.key", "args": { "key": "F11" }, "key": "f11", "when": "activeWebviewPanelId == mainframeCommander" },
+      { "command": "mc.key", "args": { "key": "Ctrl+j" }, "key": "ctrl+j", "when": "activeWebviewPanelId == mainframeCommander" },
       { "command": "mc.key", "args": { "key": "F12" }, "key": "f12", "when": "activeWebviewPanelId == mainframeCommander" }
     ],
     "configuration": {

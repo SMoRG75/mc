@@ -1,6 +1,7 @@
 import { DeleteJobs, GetJobs, SubmitJobs } from '@zowe/zos-jobs-for-zowe-sdk';
 import type { IJob } from '@zowe/zos-jobs-for-zowe-sdk';
-import type { Capabilities, ColumnDef, PaneLocation } from '../shared/protocol';
+import type { AbstractSession } from '@zowe/imperative';
+import type { Capabilities, ColumnDef, PaneLocation, ViewDto } from '../shared/protocol';
 import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
 import type { SessionManager } from '../zowe/sessions';
 import { UserFacingError } from '../core/errors';
@@ -45,7 +46,7 @@ export class JesProvider implements PaneProvider {
   capabilities(loc: PaneLocation): Capabilities {
     return {
       write: false, delete: true, rename: false, create: false,
-      submit: parseLocation(loc).kind === 'jobs',
+      submit: !parseLocation(loc).job,
     };
   }
 
@@ -54,9 +55,15 @@ export class JesProvider implements PaneProvider {
     const parsed = parseLocation(loc);
     signal.throwIfAborted();
 
-    if (parsed.kind === 'jobs') {
-      const owner = parsed.owner || this.settings.defaultOwner() || '*';
-      const jobs = await GetJobs.getJobsCommon(session, { owner, prefix: parsed.prefix || '*' });
+    if (!parsed.job) {
+      const user = sessionUser(session);
+      const owner = parsed.owner || this.settings.defaultOwner().trim().toUpperCase() || user || '*';
+      const prefix = parsed.prefix || '*';
+      const jobs = await GetJobs.getJobsCommon(session, {
+        owner,
+        prefix,
+        ...(parsed.status === 'all' ? {} : { status: parsed.status.toUpperCase() }),
+      });
       signal.throwIfAborted();
 
       const entries: Entry<JesRef>[] = jobs.map((job) => ({
@@ -77,20 +84,22 @@ export class JesProvider implements PaneProvider {
       }));
 
       return {
-        title: `JES2 / owner=${owner} / prefix=${parsed.prefix || '*'}`,
+        title: `JES2 · owner=${owner} · prefix=${prefix}${parsed.status === 'all' ? '' : ` · ${parsed.status}`}`,
         columns: JOB_COLUMNS,
         entries,
         status: `${jobs.length} jobs`,
         truncated: false,
+        views: this.views(loc, { ...parsed, owner, prefix }, user),
       };
     }
 
-    const files = await GetJobs.getSpoolFiles(session, parsed.jobname, parsed.jobid) as ZosmfSpoolFile[];
+    const files = await GetJobs.getSpoolFiles(session, parsed.job.jobname, parsed.job.jobid) as ZosmfSpoolFile[];
     signal.throwIfAborted();
+    const { jobname, jobid } = parsed.job;
 
     const entries: Entry<JesRef>[] = files.map((file) => ({
       ref: {
-        kind: 'spool', jobname: parsed.jobname, jobid: parsed.jobid,
+        kind: 'spool', jobname, jobid,
         spoolId: file.id, ddname: file.ddname,
       },
       dto: {
@@ -109,21 +118,53 @@ export class JesProvider implements PaneProvider {
     }));
 
     return {
-      title: `${parsed.jobid} · ${parsed.jobname} · spool`,
+      title: `${jobid} · ${jobname} · spool`,
       columns: SPOOL_COLUMNS,
       entries,
       status: `${files.length} spool-filer`,
       truncated: false,
+      // Picking a view from inside a job steps back out into that view.
+      views: this.views(loc, parsed, sessionUser(session)),
     };
   }
 
+  /**
+   * The four ways of looking at the queue.
+   *
+   * `Mine` and `Alle` set the owner; `Aktive` and `Output` narrow to a queue and
+   * keep whatever owner is already in force, so drilling into someone else's
+   * jobs and then asking for their output does what it says.
+   */
+  private views(loc: PaneLocation, filter: JesFilter, user: string): ViewDto[] {
+    const owner = filter.owner || user || '*';
+    const at = (patch: Partial<JesFilter>): PaneLocation => ({
+      ...loc,
+      // A view is a place to stand, never a job — selecting one leaves the spool.
+      path: toPath({ ...filter, job: undefined, ...patch }),
+    });
+    const current = filter.status !== 'all'
+      ? filter.status
+      : (owner === '*' ? 'all' : 'mine');
+
+    return [
+      { id: 'mine', label: 'Mine', location: at({ owner: user || owner, status: 'all' }), active: current === 'mine' },
+      { id: 'active', label: 'Aktive', location: at({ status: 'active' }), active: current === 'active' },
+      { id: 'output', label: 'Output', location: at({ status: 'output' }), active: current === 'output' },
+      { id: 'all', label: 'Alle', location: at({ owner: '*', status: 'all' }), active: current === 'all' },
+    ];
+  }
+
   parent(loc: PaneLocation): PaneLocation | undefined {
-    return parseLocation(loc).kind === 'jobs' ? undefined : { ...loc, path: '' };
+    const filter = parseLocation(loc);
+    // Up from a job's spool returns to the job list the user was filtering by.
+    return filter.job ? { ...loc, path: toPath({ ...filter, job: undefined }) } : undefined;
   }
 
   enter(loc: PaneLocation, entry: Entry): PaneLocation | undefined {
     const ref = entry.ref as JesRef;
-    return ref.kind === 'job' ? { ...loc, path: `${ref.jobname}/${ref.jobid}` } : undefined;
+    if (ref.kind !== 'job') return undefined;
+    const filter = parseLocation(loc);
+    return { ...loc, path: toPath({ ...filter, job: { jobname: ref.jobname, jobid: ref.jobid } }) };
   }
 
   describe(_loc: PaneLocation, entry: Entry): SourceItem {
@@ -188,22 +229,77 @@ export class JesProvider implements PaneProvider {
   }
 }
 
-type ParsedJes =
-  | { kind: 'jobs'; owner: string; prefix: string }
-  | { kind: 'spool'; jobname: string; jobid: string };
+/** The queues a JES pane can be narrowed to. `all` sends no status at all. */
+type JesStatus = 'all' | 'input' | 'active' | 'output';
 
-/** '' or 'owner=SANJ;prefix=BK*' lists jobs; 'SANJBKUP/JOB04412' lists its spool. */
-function parseLocation(loc: PaneLocation): ParsedJes {
-  const slash = loc.path.indexOf('/');
-  if (slash > 0) {
-    return {
-      kind: 'spool',
-      jobname: loc.path.slice(0, slash),
-      jobid: loc.path.slice(slash + 1),
-    };
+/**
+ * Everything a JES pane path says, parsed.
+ *
+ * The filter travels with the pane even while a job's spool is open (`job`),
+ * which is what lets Backspace put the user back in the view they came from
+ * rather than dumping them in the default one.
+ */
+interface JesFilter {
+  /** Empty means "not stated" — the session user is filled in at list time. */
+  owner: string;
+  /** Empty means `*`. */
+  prefix: string;
+  status: JesStatus;
+  job?: { jobname: string; jobid: string };
+}
+
+/**
+ * `owner=SANJ;prefix=BK*;status=active` lists jobs, plus `;job=SANJBKUP/JOB04412`
+ * for that job's spool. A bare `SANJBKUP/JOB04412` is still understood, so
+ * paths written by hand in `mc.panes.*` keep working.
+ */
+function parseLocation(loc: PaneLocation): JesFilter {
+  const empty: JesFilter = { owner: '', prefix: '', status: 'all' };
+  if (!loc.path) return empty;
+
+  if (!loc.path.includes('=')) {
+    const slash = loc.path.indexOf('/');
+    return slash > 0
+      ? { ...empty, job: { jobname: loc.path.slice(0, slash), jobid: loc.path.slice(slash + 1) } }
+      : empty;
   }
-  const filter = new URLSearchParams(loc.path.replace(/;/g, '&'));
-  return { kind: 'jobs', owner: filter.get('owner') ?? '', prefix: filter.get('prefix') ?? '' };
+
+  const query = new URLSearchParams(loc.path.replace(/;/g, '&'));
+  const job = query.get('job') ?? '';
+  const slash = job.indexOf('/');
+  return {
+    owner: query.get('owner') ?? '',
+    prefix: query.get('prefix') ?? '',
+    status: asStatus(query.get('status')),
+    job: slash > 0
+      ? { jobname: job.slice(0, slash), jobid: job.slice(slash + 1) }
+      : undefined,
+  };
+}
+
+/** The inverse of `parseLocation`; only states what differs from the default. */
+function toPath(filter: JesFilter): string {
+  const parts: string[] = [];
+  if (filter.owner) parts.push(`owner=${filter.owner}`);
+  if (filter.prefix && filter.prefix !== '*') parts.push(`prefix=${filter.prefix}`);
+  if (filter.status !== 'all') parts.push(`status=${filter.status}`);
+  if (filter.job) parts.push(`job=${filter.job.jobname}/${filter.job.jobid}`);
+  return parts.join(';');
+}
+
+function asStatus(value: string | null): JesStatus {
+  const lower = (value ?? '').toLowerCase();
+  return lower === 'input' || lower === 'active' || lower === 'output' ? lower : 'all';
+}
+
+/**
+ * The user the profile logs in as, which is who "my jobs" means.
+ *
+ * Empty when the profile authenticates by token or certificate rather than by
+ * user name; the caller then falls back to `*` rather than guessing.
+ */
+function sessionUser(session: AbstractSession): string {
+  return (session.ISession?.user ?? '').trim().toUpperCase();
 }
 
 function isFailure(job: IJob): boolean {
