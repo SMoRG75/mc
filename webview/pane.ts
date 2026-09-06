@@ -142,9 +142,15 @@ export class Pane {
       this.view = [];
       return;
     }
+    // '..' belongs in the name column — that is the one that carries the icon
+    // and is left-aligned. Column order is the provider's business, not ours.
+    const nameColumn = this.listing.columns.find((c) => c.id === 'name')
+      ?? this.listing.columns[0];
     const up: EntryDto = {
       id: '..', name: '..', kind: 'up',
-      cells: Object.fromEntries(this.listing.columns.map((c, i) => [c.id, i === 0 ? '..' : ''])),
+      cells: Object.fromEntries(
+        this.listing.columns.map((c) => [c.id, c.id === nameColumn?.id ? '..' : '']),
+      ),
     };
     const rows = this.listing.entries
       .filter((entry) => !this.filter || entry.name.toLowerCase().includes(this.filter))

@@ -18,9 +18,11 @@ const JOB_COLUMNS: ColumnDef[] = [
   { id: 'class', title: 'Class', width: 10 },
 ];
 
+// The name column goes first here as in every other listing: it carries the
+// icon and the '..' row, and both look wrong hanging off a right-aligned ID.
 const SPOOL_COLUMNS: ColumnDef[] = [
-  { id: 'id', title: 'ID', width: 10, align: 'right' },
-  { id: 'name', title: 'DDNAME', width: 24 },
+  { id: 'name', title: 'DDNAME', width: 26 },
+  { id: 'id', title: 'ID', width: 8, align: 'right' },
   { id: 'step', title: 'Stepname', width: 22 },
   { id: 'records', title: 'Records', width: 20, align: 'right' },
   { id: 'class', title: 'Class', width: 12 },
