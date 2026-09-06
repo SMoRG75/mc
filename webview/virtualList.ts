@@ -19,6 +19,8 @@ export class VirtualList {
   private columns: ColumnDef[] = [];
   private cursor = 0;
   private marked = new Set<string>();
+  /** The window currently built in the DOM; -1 forces the next paint to rebuild. */
+  private painted = { first: -1, last: -1 };
 
   constructor(
     private readonly onActivate: (entry: EntryDto) => void,
@@ -60,6 +62,7 @@ export class VirtualList {
     this.entries = entries;
     this.cursor = Math.min(this.cursor, Math.max(0, entries.length - 1));
     this.spacer.style.height = `${entries.length * ROW_HEIGHT}px`;
+    this.painted = { first: -1, last: -1 };
     this.paint();
   }
 
@@ -92,14 +95,40 @@ export class VirtualList {
     }
   }
 
+  /**
+   * Rebuilds the visible window, or — when the same rows are already in the DOM
+   * — only re-flags them.
+   *
+   * Keeping the elements matters beyond the saved work: a click that replaced
+   * the row it landed on left the browser with no shared element between the
+   * two clicks of a double-click, so `dblclick` fired on the container and the
+   * row was never found.
+   */
   private paint(): void {
     const first = Math.max(0, Math.floor(this.viewport.scrollTop / ROW_HEIGHT) - OVERSCAN);
     const last = Math.min(this.entries.length, first + this.visibleRowCount + OVERSCAN * 2);
+
+    if (first === this.painted.first && last === this.painted.last) {
+      this.reflag();
+      return;
+    }
 
     this.rows.style.transform = `translateY(${first * ROW_HEIGHT}px)`;
     this.rows.replaceChildren(
       ...this.entries.slice(first, last).map((entry, offset) => this.row(entry, first + offset)),
     );
+    this.painted = { first, last };
+  }
+
+  /** The only things that change without the data changing: cursor and marks. */
+  private reflag(): void {
+    for (const element of this.rows.children) {
+      const row = element as HTMLElement;
+      const index = Number(row.dataset.index);
+      const entry = this.entries[index];
+      row.classList.toggle('cursor', index === this.cursor);
+      row.classList.toggle('marked', entry !== undefined && this.marked.has(entry.id));
+    }
   }
 
   private row(entry: EntryDto, index: number): HTMLElement {
