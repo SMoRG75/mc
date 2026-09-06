@@ -85,6 +85,15 @@ special case, just `source.read()` followed by `target.write()`.
   for sites with a page of their own. It applies to every direction: F3/F4 read
   with it, Ctrl+S writes with it, and F5 uses it at both ends — a file read in
   one codepage and written back in another is how national characters get lost.
+- **The panes reopen where you left them.** `mc.panes.*` says where a pane
+  *starts*; after that the position that last listed successfully is what comes
+  back, so the PDS or USS directory you were working in — and which LPAR it was
+  on — survives closing VS Code. It is kept in the extension's own storage
+  rather than written back into `mc.panes.*`, because it changes on every
+  navigation and that settings file is often under git. The setting still wins
+  whenever it has been edited since: the position is remembered together with
+  the `mc.panes.*` value it was remembered against, so changing the setting is
+  never silently ignored.
 - **`Shift+F3` decodes the bytes here, not on the host.** F3 asks z/OSMF for a
   conversion, which only works for content the host agrees is text. A load
   module, a data set read in binary, or an EBCDIC file that was FTP'd down to

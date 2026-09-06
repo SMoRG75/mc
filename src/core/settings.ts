@@ -1,6 +1,20 @@
 import * as os from 'node:os';
 import * as vscode from 'vscode';
-import type { PaneLocation, TransferOptions } from '../shared/protocol';
+import type { PaneId, PaneKind, PaneLocation, TransferOptions } from '../shared/protocol';
+
+/**
+ * Where the panes were pointing when they were last listed, and the `mc.panes.*`
+ * values that was remembered against.
+ *
+ * `from` is what keeps the setting meaningful. Without it a remembered position
+ * would shadow the setting for ever, and editing `mc.panes.left` would look
+ * like it did nothing.
+ */
+export interface RememberedPanes {
+  left: PaneLocation;
+  right: PaneLocation;
+  from: { left: PaneLocation; right: PaneLocation };
+}
 
 /** Thin, typed reader over the `mc.*` configuration keys declared in package.json. */
 export const settings = {
@@ -58,7 +72,8 @@ export const settings = {
     await config.update('transfer.codepage', codepage, target);
   },
 
-  startLocation: (pane: 'left' | 'right'): PaneLocation => {
+  /** Where the pane opens when nothing has been remembered: the user's own setting. */
+  configuredStartLocation: (pane: PaneId): PaneLocation => {
     const fallback: PaneLocation = pane === 'left'
       ? { kind: 'local', profile: '', path: defaultLocalPath() }
       : { kind: 'ds', profile: '', path: '' };
@@ -69,7 +84,53 @@ export const settings = {
       path: configured.path || (configured.kind === 'local' ? defaultLocalPath() : fallback.path),
     };
   },
+
+  /**
+   * Where the pane opens.
+   *
+   * The place it was left is the answer nearly always: coming back to the PDS
+   * or the USS directory you were working in is the whole point of a file
+   * manager remembering anything. The setting wins only when it has been changed
+   * since — that is the user saying where to start, and a position remembered
+   * from before the change says nothing about it.
+   */
+  startLocation: (pane: PaneId, remembered?: RememberedPanes): PaneLocation => {
+    const configured = settings.configuredStartLocation(pane);
+    if (!remembered) return configured;
+    return sameLocation(remembered.from[pane], configured) ? remembered[pane] : configured;
+  },
 };
+
+export function sameLocation(a: PaneLocation, b: PaneLocation): boolean {
+  return a.kind === b.kind && a.profile === b.profile && a.path === b.path;
+}
+
+const KINDS: PaneKind[] = ['local', 'ds', 'uss', 'jes'];
+
+function asLocation(value: unknown): PaneLocation | undefined {
+  const raw = value as Partial<PaneLocation> | undefined;
+  if (!raw || typeof raw.profile !== 'string' || typeof raw.path !== 'string') return undefined;
+  return KINDS.includes(raw.kind as PaneKind)
+    ? { kind: raw.kind as PaneKind, profile: raw.profile, path: raw.path }
+    : undefined;
+}
+
+/**
+ * Reads the remembered position back.
+ *
+ * Checked rather than cast: this outlives the version of the extension that
+ * wrote it, and a pane pointed at a `kind` that no longer exists would fail on
+ * the first listing with an error about the provider registry.
+ */
+export function asRememberedPanes(value: unknown): RememberedPanes | undefined {
+  const raw = value as { left?: unknown; right?: unknown; from?: { left?: unknown; right?: unknown } };
+  const left = asLocation(raw?.left);
+  const right = asLocation(raw?.right);
+  const fromLeft = asLocation(raw?.from?.left);
+  const fromRight = asLocation(raw?.from?.right);
+  if (!left || !right || !fromLeft || !fromRight) return undefined;
+  return { left, right, from: { left: fromLeft, right: fromRight } };
+}
 
 /**
  * The codepages offered when `mc.transfer.codepages` says nothing.

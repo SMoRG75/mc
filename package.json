@@ -39,7 +39,7 @@
         "mc.panes.left": {
           "type": "object",
           "default": { "kind": "local", "profile": "", "path": "" },
-          "markdownDescription": "Location the left pane opens on. `kind` is one of `local`, `ds`, `uss`, `jes`.",
+          "markdownDescription": "Where the left pane starts. `kind` is one of `local`, `ds`, `uss`, `jes`. After that the pane reopens wherever you last left it — change this setting to override that and start somewhere else.",
           "properties": {
             "kind": { "type": "string", "enum": ["local", "ds", "uss", "jes"] },
             "profile": { "type": "string" },
@@ -49,7 +49,7 @@
         "mc.panes.right": {
           "type": "object",
           "default": { "kind": "ds", "profile": "", "path": "" },
-          "markdownDescription": "Location the right pane opens on. An empty `profile` means the default Zowe profile."
+          "markdownDescription": "Where the right pane starts. An empty `profile` means the default Zowe profile. After that the pane reopens wherever you last left it — change this setting to override that and start somewhere else."
         },
         "mc.transfer.defaultMode": {
           "type": "string",

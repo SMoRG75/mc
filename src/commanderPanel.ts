@@ -6,10 +6,19 @@ import type { Entry, PaneProvider, ProviderRegistry } from './core/provider';
 import { TransferQueue, type TransferRequest } from './core/transferQueue';
 import { EditorBridge, type OpenMode } from './core/editorBridge';
 import { describeError, UserFacingError } from './core/errors';
-import { settings } from './core/settings';
+import { asRememberedPanes, settings, type RememberedPanes } from './core/settings';
 import type { SessionManager } from './zowe/sessions';
 
 const VIEW_TYPE = 'mainframeCommander';
+
+/**
+ * Where the panes were last pointing, in the extension's own storage.
+ *
+ * Not in `mc.panes.*`: that is the user saying where to start, and it lives in
+ * a settings.json that may well be under git. This changes on every navigation,
+ * which is a different kind of thing and belongs in a memento.
+ */
+const REMEMBERED_PANES = 'panes.last';
 
 interface PaneState {
   location: PaneLocation;
@@ -33,6 +42,8 @@ export class CommanderPanel {
   private readonly queue: TransferQueue;
   private readonly disposables: vscode.Disposable[] = [];
   private jesTimer?: NodeJS.Timeout;
+  /** The last state written, so a JES pane refreshing itself does not rewrite it. */
+  private remembered = '';
 
   static show(
     context: vscode.ExtensionContext,
@@ -69,9 +80,10 @@ export class CommanderPanel {
     private readonly providers: ProviderRegistry,
     private readonly sessions: SessionManager,
   ) {
+    const remembered = asRememberedPanes(context.globalState.get(REMEMBERED_PANES));
     this.panes = {
-      left: { location: settings.startLocation('left'), entries: [] },
-      right: { location: settings.startLocation('right'), entries: [] },
+      left: { location: settings.startLocation('left', remembered), entries: [] },
+      right: { location: settings.startLocation('right', remembered), entries: [] },
     };
 
     this.queue = new TransferQueue(
@@ -240,6 +252,7 @@ export class CommanderPanel {
           views: listing.views,
         },
       });
+      this.rememberPanes();
     } catch (err) {
       if (controller.signal.aborted) return;
       const { message, detail } = describeError(err);
@@ -247,6 +260,30 @@ export class CommanderPanel {
     } finally {
       if (!controller.signal.aborted) this.post({ type: 'busy', pane, busy: false });
     }
+  }
+
+  /**
+   * Keeps where the panes are pointing, so the next session opens there.
+   *
+   * Written on every listing that succeeded rather than when the panel closes:
+   * VS Code is usually shut down with the panel still open, and nothing
+   * guarantees an async write started from `onDidDispose` ever finishes. Saving
+   * as we go also means a path that failed to list is not what you come back
+   * to — only somewhere that actually worked is worth reopening on.
+   */
+  private rememberPanes(): void {
+    const state: RememberedPanes = {
+      left: this.panes.left.location,
+      right: this.panes.right.location,
+      from: {
+        left: settings.configuredStartLocation('left'),
+        right: settings.configuredStartLocation('right'),
+      },
+    };
+    const json = JSON.stringify(state);
+    if (json === this.remembered) return;
+    this.remembered = json;
+    void this.context.globalState.update(REMEMBERED_PANES, state);
   }
 
   private async openInEditor(pane: PaneId, entryId: string, mode: OpenMode): Promise<void> {
