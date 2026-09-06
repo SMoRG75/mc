@@ -1,10 +1,15 @@
 .vscode/**
+.claude/**
+.gitignore
 src/**
 webview/**
 docs/**
 out/**
+scripts/**
 esbuild.mjs
 tsconfig.json
+# The package is built in the repository root; it must not land inside the next one.
+*.vsix
 **/*.map
 **/*.ts
 !dist/**

@@ -19,6 +19,19 @@ command **Mainframe Commander: Open** (`Ctrl+Shift+M`).
 
 `npm run typecheck` runs TypeScript over both the extension and the webview half.
 
+```bash
+npm run vsix           # -> mainframe-commander-<version>.vsix
+```
+
+One package covers every platform: the only native code is the Zowe credential
+manager, and it ships a prebuilt binary for each of the eleven targets in the
+same npm package — so there is no `vsce package --target` per architecture.
+[`scripts/package-vsix.mjs`](scripts/package-vsix.mjs) checks that before
+handing over to `vsce`, because the Zowe SDKs are deliberately unbundled: a
+package built without them in `node_modules` installs perfectly and then throws
+`Cannot find module '@zowe/imperative'` the first time someone presses
+`Ctrl+Shift+M`.
+
 ## How it fits together
 
 ```

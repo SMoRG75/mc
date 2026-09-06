@@ -5,62 +5,217 @@
   "version": "0.1.0",
   "publisher": "san",
   "license": "EPL-2.0",
-  "repository": { "type": "git", "url": "https://github.com/san/mainframe-commander.git" },
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Other"],
-  "keywords": ["mainframe", "zowe", "z/OS", "mvs", "uss", "jes", "commander"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/san/mainframe-commander.git"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "mainframe",
+    "zowe",
+    "z/OS",
+    "mvs",
+    "uss",
+    "jes",
+    "commander"
+  ],
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
-      { "command": "mc.open", "title": "Mainframe Commander: Open", "icon": "$(split-horizontal)" },
-      { "command": "mc.key", "title": "Mainframe Commander: Forward key to panel" }
+      {
+        "command": "mc.open",
+        "title": "Mainframe Commander: Open",
+        "icon": "$(split-horizontal)"
+      },
+      {
+        "command": "mc.key",
+        "title": "Mainframe Commander: Forward key to panel"
+      }
     ],
     "keybindings": [
-      { "command": "mc.open", "key": "ctrl+shift+m", "mac": "cmd+shift+m" },
-
-      { "command": "mc.key", "args": { "key": "F3" }, "key": "f3", "when": "activeWebviewPanelId == mainframeCommander" },
-      { "command": "mc.key", "args": { "key": "Shift+F3" }, "key": "shift+f3", "when": "activeWebviewPanelId == mainframeCommander" },
-      { "command": "mc.key", "args": { "key": "F4" }, "key": "f4", "when": "activeWebviewPanelId == mainframeCommander" },
-      { "command": "mc.key", "args": { "key": "F5" }, "key": "f5", "when": "activeWebviewPanelId == mainframeCommander" },
-      { "command": "mc.key", "args": { "key": "Shift+F5" }, "key": "shift+f5", "when": "activeWebviewPanelId == mainframeCommander" },
-      { "command": "mc.key", "args": { "key": "F6" }, "key": "f6", "when": "activeWebviewPanelId == mainframeCommander" },
-      { "command": "mc.key", "args": { "key": "F7" }, "key": "f7", "when": "activeWebviewPanelId == mainframeCommander" },
-      { "command": "mc.key", "args": { "key": "F8" }, "key": "f8", "when": "activeWebviewPanelId == mainframeCommander" },
-      { "command": "mc.key", "args": { "key": "F9" }, "key": "f9", "when": "activeWebviewPanelId == mainframeCommander" },
-      { "command": "mc.key", "args": { "key": "F10" }, "key": "f10", "when": "activeWebviewPanelId == mainframeCommander" },
-      { "command": "mc.key", "args": { "key": "F11" }, "key": "f11", "when": "activeWebviewPanelId == mainframeCommander" },
-      { "command": "mc.key", "args": { "key": "Ctrl+j" }, "key": "ctrl+j", "when": "activeWebviewPanelId == mainframeCommander" },
-      { "command": "mc.key", "args": { "key": "F12" }, "key": "f12", "when": "activeWebviewPanelId == mainframeCommander" }
+      {
+        "command": "mc.open",
+        "key": "ctrl+shift+m",
+        "mac": "cmd+shift+m"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "F3"
+        },
+        "key": "f3",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "Shift+F3"
+        },
+        "key": "shift+f3",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "F4"
+        },
+        "key": "f4",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "F5"
+        },
+        "key": "f5",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "Shift+F5"
+        },
+        "key": "shift+f5",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "F6"
+        },
+        "key": "f6",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "F7"
+        },
+        "key": "f7",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "F8"
+        },
+        "key": "f8",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "F9"
+        },
+        "key": "f9",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "F10"
+        },
+        "key": "f10",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "F11"
+        },
+        "key": "f11",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "Ctrl+j"
+        },
+        "key": "ctrl+j",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "F12"
+        },
+        "key": "f12",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      }
     ],
     "configuration": {
       "title": "Mainframe Commander",
       "properties": {
         "mc.panes.left": {
           "type": "object",
-          "default": { "kind": "local", "profile": "", "path": "" },
+          "default": {
+            "kind": "local",
+            "profile": "",
+            "path": ""
+          },
           "markdownDescription": "Where the left pane starts. `kind` is one of `local`, `ds`, `uss`, `jes`. After that the pane reopens wherever you last left it — change this setting to override that and start somewhere else.",
           "properties": {
-            "kind": { "type": "string", "enum": ["local", "ds", "uss", "jes"] },
-            "profile": { "type": "string" },
-            "path": { "type": "string" }
+            "kind": {
+              "type": "string",
+              "enum": [
+                "local",
+                "ds",
+                "uss",
+                "jes"
+              ]
+            },
+            "profile": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
           }
         },
         "mc.panes.right": {
           "type": "object",
-          "default": { "kind": "ds", "profile": "", "path": "" },
+          "default": {
+            "kind": "ds",
+            "profile": "",
+            "path": ""
+          },
           "markdownDescription": "Where the right pane starts. An empty `profile` means the default Zowe profile. After that the pane reopens wherever you last left it — change this setting to override that and start somewhere else."
         },
         "mc.transfer.defaultMode": {
           "type": "string",
-          "enum": ["text", "binary", "auto"],
+          "enum": [
+            "text",
+            "binary",
+            "auto"
+          ],
           "default": "auto",
           "markdownDescription": "Default transfer mode for F5. `auto` picks binary for the extensions in `#mc.transfer.binaryExtensions#` and text for everything else."
         },
         "mc.transfer.binaryExtensions": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": [".gz", ".zip", ".tar", ".jar", ".war", ".png", ".jpg", ".gif", ".pdf", ".class", ".so", ".bin"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".gz",
+            ".zip",
+            ".tar",
+            ".jar",
+            ".war",
+            ".png",
+            ".jpg",
+            ".gif",
+            ".pdf",
+            ".class",
+            ".so",
+            ".bin"
+          ],
           "description": "Extensions treated as binary when the transfer mode is 'auto'."
         },
         "mc.transfer.codepage": {
@@ -70,18 +225,46 @@
         },
         "mc.transfer.codepages": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [
-            "IBM-037", "IBM-273", "IBM-277", "IBM-278", "IBM-280", "IBM-284", "IBM-285",
-            "IBM-297", "IBM-500", "IBM-870", "IBM-871", "IBM-1025", "IBM-1026", "IBM-1047",
-            "IBM-1140", "IBM-1141", "IBM-1142", "IBM-1143", "IBM-1144", "IBM-1145",
-            "IBM-1146", "IBM-1147", "IBM-1148", "IBM-1149", "ISO8859-1", "UTF-8"
+            "IBM-037",
+            "IBM-273",
+            "IBM-277",
+            "IBM-278",
+            "IBM-280",
+            "IBM-284",
+            "IBM-285",
+            "IBM-297",
+            "IBM-500",
+            "IBM-870",
+            "IBM-871",
+            "IBM-1025",
+            "IBM-1026",
+            "IBM-1047",
+            "IBM-1140",
+            "IBM-1141",
+            "IBM-1142",
+            "IBM-1143",
+            "IBM-1144",
+            "IBM-1145",
+            "IBM-1146",
+            "IBM-1147",
+            "IBM-1148",
+            "IBM-1149",
+            "ISO8859-1",
+            "UTF-8"
           ],
           "markdownDescription": "Codepages offered by the picker in the F5 dialog. Add your own if your site uses a page that is not listed; `#mc.transfer.codepage#` is always offered whether it is in this list or not."
         },
         "mc.transfer.longLines": {
           "type": "string",
-          "enum": ["wrap", "truncate", "abort"],
+          "enum": [
+            "wrap",
+            "truncate",
+            "abort"
+          ],
           "default": "abort",
           "markdownDescription": "What to do when a text line is longer than the target LRECL. `abort` is the safe default — silent truncation corrupts JCL."
         },
@@ -142,6 +325,7 @@
     "watch": "node esbuild.mjs --watch",
     "package": "node esbuild.mjs --production",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p webview/tsconfig.json",
+    "vsix": "node scripts/package-vsix.mjs",
     "vscode:prepublish": "npm run typecheck && npm run package"
   },
   "dependencies": {
@@ -154,6 +338,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.25.0",
     "typescript": "^5.6.0"
   }
