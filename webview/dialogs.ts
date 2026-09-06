@@ -1,20 +1,43 @@
 import type { TransferOptions } from '../src/shared/protocol';
 
+let openCount = 0;
+
+/**
+ * True while a dialog is up.
+ *
+ * The app listens for keys on `window` and calls preventDefault on everything
+ * the keymap claims — Enter, Tab, Backspace, Space. A focused text field inside
+ * a dialog would never see them, so the keymap has to stand down while a dialog
+ * owns the keyboard.
+ */
+export function modalOpen(): boolean {
+  return openCount > 0;
+}
+
 /** Builds a modal, resolves with its result, and always cleans itself up. */
 function modal<T>(
   build: (resolve: (value: T | undefined) => void) => HTMLElement,
 ): Promise<T | undefined> {
   return new Promise((resolve) => {
+    // Where the keyboard was, so closing the dialog gives it back to the pane
+    // instead of dropping focus on <body>.
+    const returnFocus = document.activeElement as HTMLElement | null;
     const backdrop = document.createElement('div');
     backdrop.className = 'backdrop';
+    let done = false;
     const finish = (value: T | undefined) => {
+      if (done) return;
+      done = true;
+      openCount -= 1;
       backdrop.remove();
       box.remove();
+      returnFocus?.focus?.({ preventScroll: true });
       resolve(value);
     };
     const box = build(finish);
     box.classList.add('modal');
     backdrop.addEventListener('mousedown', () => finish(undefined));
+    openCount += 1;
     document.body.append(backdrop, box);
     box.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') finish(undefined);

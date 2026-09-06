@@ -3,7 +3,7 @@ import type {
 } from '../src/shared/protocol';
 import { Pane } from './pane';
 import { Dispatcher, type Action } from './keymap';
-import { prompt, transferDialog } from './dialogs';
+import { modalOpen, prompt, transferDialog } from './dialogs';
 import { send } from './vscode';
 
 const FKEYS: [string, string][] = [
@@ -41,6 +41,8 @@ class App {
     this.setActive('left');
 
     window.addEventListener('keydown', (event) => {
+      // A dialog handles its own keys, including the Escape that closes it.
+      if (modalOpen()) return;
       if (this.filterMode) return this.handleFilterKey(event);
       if (document.activeElement === this.commandInput && event.key !== 'Escape') return;
       this.dispatcher.fromEvent(event);
@@ -91,6 +93,9 @@ class App {
       const button = document.createElement('button');
       button.className = 'fk';
       button.innerHTML = `<b>${key}</b>${label}`;
+      // Clicking the bar must not take the keyboard away from the pane —
+      // otherwise the next Enter presses the button again.
+      button.addEventListener('mousedown', (event) => event.preventDefault());
       button.addEventListener('click', () => this.dispatcher.fromHost(key));
       return button;
     }));
@@ -124,7 +129,9 @@ class App {
         this.renderTransfers(message.jobs);
         break;
       case 'key':
-        this.dispatcher.fromHost(message.key);
+        // VS Code keeps forwarding F-keys while a dialog is up; F6 on top of an
+        // open rename dialog must not open a second one.
+        if (!modalOpen()) this.dispatcher.fromHost(message.key);
         break;
       case 'focus':
         this.focusActivePane();
@@ -304,9 +311,7 @@ class App {
    * somewhere on purpose, in which case taking focus would be the bug.
    */
   private focusActivePane(): void {
-    const active = document.activeElement;
-    if (active === this.commandInput) return;
-    if (active instanceof HTMLElement && active.closest('.modal')) return;
+    if (modalOpen() || document.activeElement === this.commandInput) return;
     this.panes[this.active].focus();
   }
 
