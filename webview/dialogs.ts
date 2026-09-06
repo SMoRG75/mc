@@ -1,4 +1,4 @@
-import type { TransferOptions } from '../src/shared/protocol';
+import type { DatasetSpec, TransferOptions } from '../src/shared/protocol';
 
 let openCount = 0;
 
@@ -46,12 +46,13 @@ function modal<T>(
   });
 }
 
-export function prompt(title: string, value = ''): Promise<string | undefined> {
+export function prompt(title: string, value = '', hint = ''): Promise<string | undefined> {
   return modal<string>((resolve) => {
     const box = document.createElement('form');
     box.innerHTML = `
       <div class="mh">${escapeHtml(title)}</div>
-      <div class="mb"><input class="field" type="text" spellcheck="false"></div>
+      <div class="mb"><input class="field" type="text" spellcheck="false">
+        ${hint ? `<p class="hint flush">${escapeHtml(hint)}</p>` : ''}</div>
       <div class="mf">
         <button type="button" class="btn" data-cancel>Annullér</button>
         <button type="submit" class="btn pri">OK</button>
@@ -138,6 +139,167 @@ export function transferDialog(
     });
     return box;
   });
+}
+
+/**
+ * The F7 dialog on an MVS pane.
+ *
+ * The templates are the point: nearly every allocation is one of four shapes,
+ * and the ones that are not are a `LIKE` of something that already exists. The
+ * individual attributes stay on screen anyway, because a dataset's record format
+ * cannot be changed afterwards — the mistake is only visible once something has
+ * been written into it.
+ */
+export function datasetDialog(
+  suggestedName: string,
+): Promise<{ name: string; spec: DatasetSpec } | undefined> {
+  return modal<{ name: string; spec: DatasetSpec }>((resolve) => {
+    const box = document.createElement('form');
+    box.className = 'alloc';
+    box.innerHTML = `
+      <div class="mh">Allokér datasæt<span>F7</span></div>
+      <div class="mb">
+        <label class="row"><span>Navn</span>
+          <input class="field" name="name" spellcheck="false" autocapitalize="off"></label>
+        <p class="hint">Som i TSO: uden apostrof foran sættes din bruger på som første kvalifikation.</p>
+        <label class="row"><span>Som eksisterende</span>
+          <input class="field" name="like" spellcheck="false" placeholder="LIKE — tomt: brug felterne nedenfor"></label>
+        <div class="attrs">
+          <div class="row"><span>Type</span>${radios('type', [
+            ['pdse', 'Bibliotek (PDS/E)'], ['pds', 'PDS'], ['seq', 'Sekventiel'],
+          ], 'pdse')}</div>
+          <label class="row"><span>Skabelon</span>
+            <select class="field" name="template">
+              <option value="fb80">JCL og kildekode — FB 80</option>
+              <option value="fba133">Listing — FBA 133</option>
+              <option value="vb255">Variabel tekst — VB 255</option>
+              <option value="load">Load-modul — U, PDS/E</option>
+              <option value="custom">Egne værdier</option>
+            </select></label>
+          <div class="row"><span>Format</span>
+            <input class="field num" name="recfm" spellcheck="false" title="RECFM">
+            <span class="unit">LRECL</span><input class="field num" name="lrecl" inputmode="numeric">
+            <span class="unit">BLKSIZE</span><input class="field num" name="blksize" inputmode="numeric" placeholder="auto">
+          </div>
+          <div class="row"><span>Plads</span>
+            <input class="field num" name="primary" inputmode="numeric" title="Primær">
+            <span class="unit">+</span><input class="field num" name="secondary" inputmode="numeric" title="Sekundær">
+            ${radios('alcunit', [['TRK', 'Spor'], ['CYL', 'Cylindre']], 'TRK')}
+          </div>
+          <label class="row dirblk"><span>Katalogblokke</span>
+            <input class="field num" name="dirblk" inputmode="numeric"></label>
+        </div>
+        <div class="row"><span>Volume / SMS</span>
+          <input class="field mid" name="volser" spellcheck="false" placeholder="VOLSER">
+          <input class="field mid" name="dataclass" spellcheck="false" placeholder="Dataklasse">
+          <input class="field mid" name="storclass" spellcheck="false" placeholder="Lagerklasse">
+        </div>
+        <p class="hint">Tomme felter overlades til SMS og systemets standarder — også sammen med en model.</p>
+      </div>
+      <div class="mf">
+        <button type="button" class="btn" data-cancel>Annullér</button>
+        <button type="submit" class="btn pri">Allokér</button>
+      </div>`;
+
+    const form = box as HTMLFormElement;
+    const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
+    const template = form.elements.namedItem('template') as HTMLSelectElement;
+    const attrs = box.querySelector('.attrs') as HTMLElement;
+    const dirblkRow = box.querySelector('.dirblk') as HTMLElement;
+
+    field('name').value = suggestedName;
+    field('primary').value = '10';
+    field('secondary').value = '5';
+    field('dirblk').value = '20';
+    applyTemplate('fb80');
+    syncType();
+
+    function applyTemplate(id: string): void {
+      const shape = TEMPLATES[id];
+      if (!shape) return;
+      field('recfm').value = shape.recfm;
+      field('lrecl').value = String(shape.lrecl);
+      field('blksize').value = shape.blksize ? String(shape.blksize) : '';
+      if (shape.type) {
+        (form.querySelector(`input[name="type"][value="${shape.type}"]`) as HTMLInputElement).checked = true;
+        syncType();
+      }
+    }
+
+    /** Directory blocks only exist on an old-style PDS; a PDS/E grows its own. */
+    function syncType(): void {
+      dirblkRow.classList.toggle('hidden', selectedType() !== 'pds');
+    }
+
+    function selectedType(): DatasetSpec['type'] {
+      return (new FormData(form).get('type') as DatasetSpec['type']) ?? 'pdse';
+    }
+
+    box.addEventListener('change', (event) => {
+      const target = event.target as HTMLInputElement;
+      if (target === (template as HTMLElement)) applyTemplate(template.value);
+      if (target.name === 'type') syncType();
+    });
+    // Touching a shape field by hand means the template no longer describes it.
+    for (const name of ['recfm', 'lrecl', 'blksize']) {
+      field(name).addEventListener('input', () => { template.value = 'custom'; });
+    }
+    // With a model dataset every attribute is inherited, so leaving the fields
+    // editable would only suggest they still matter.
+    field('like').addEventListener('input', () => {
+      const modelled = field('like').value.trim().length > 0;
+      attrs.classList.toggle('disabled', modelled);
+      for (const element of attrs.querySelectorAll('input, select')) {
+        (element as HTMLInputElement).disabled = modelled;
+      }
+    });
+
+    box.querySelector('[data-cancel]')?.addEventListener('click', () => resolve(undefined));
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      const name = String(data.get('name') ?? '').trim();
+      if (!name) return field('name').focus();
+      const like = String(data.get('like') ?? '').trim();
+      const type = selectedType();
+      resolve({
+        name,
+        spec: {
+          type,
+          recfm: String(data.get('recfm') ?? 'FB').trim() || 'FB',
+          lrecl: number(data.get('lrecl'), 80),
+          blksize: number(data.get('blksize'), 0),
+          primary: Math.max(1, number(data.get('primary'), 10)),
+          secondary: number(data.get('secondary'), 0),
+          alcunit: (data.get('alcunit') as DatasetSpec['alcunit']) ?? 'TRK',
+          dirblk: type === 'pds' ? Math.max(1, number(data.get('dirblk'), 20)) : undefined,
+          volser: text(data.get('volser')),
+          dataclass: text(data.get('dataclass')),
+          storclass: text(data.get('storclass')),
+          like: like || undefined,
+        },
+      });
+    });
+    return box;
+  });
+}
+
+/** The four shapes nearly every allocation actually is. */
+const TEMPLATES: Record<string, { recfm: string; lrecl: number; blksize?: number; type?: DatasetSpec['type'] }> = {
+  fb80: { recfm: 'FB', lrecl: 80 },
+  fba133: { recfm: 'FBA', lrecl: 133 },
+  vb255: { recfm: 'VB', lrecl: 255 },
+  load: { recfm: 'U', lrecl: 0, blksize: 32760, type: 'pdse' },
+  // 'custom' is deliberately absent: picking it leaves the fields alone.
+};
+
+function number(value: FormDataEntryValue | null, fallback: number): number {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function text(value: FormDataEntryValue | null): string | undefined {
+  return String(value ?? '').trim() || undefined;
 }
 
 function radios(name: string, options: [string, string][], selected: string): string {

@@ -170,10 +170,22 @@ export class CommanderPanel {
           break;
         }
 
-        case 'create':
-          await this.provider(msg.pane).create(this.panes[msg.pane].location, msg.name);
+        case 'create': {
+          const state = this.panes[msg.pane];
+          const created = await this.provider(msg.pane).create(
+            state.location, msg.name, msg.dataset,
+          );
           await this.refresh(msg.pane);
+          // The name that was typed is not always the name that was made — and a
+          // dataset allocated outside the pane's own filter refreshes into the
+          // same listing as before, which looks exactly like nothing happened.
+          if (msg.dataset && !state.entries.some((e) => e.dto.name === created)) {
+            void vscode.window.showInformationMessage(
+              `${created} er allokeret, men ligger uden for filteret '${state.location.path}'.`,
+            );
+          }
           break;
+        }
 
         case 'submit':
           await this.submit(msg.pane, msg.entryIds);

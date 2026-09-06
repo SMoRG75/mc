@@ -63,6 +63,16 @@ særtilfælde, men bare `source.read()` efterfulgt af `target.write()`.
 - **JES er et filsystem.** Jobs er mapper, spool-DD'er er filer. Derfor betyder
   F3/F5/F8 det samme dér som alle andre steder, uden en separat kommandopalette
   til jobs.
+- **F7 spørger om mere end et navn på MVS.** RECFM, LRECL og pladsen kan ikke
+  ændres bagefter, så allokeringen har en rigtig dialog med de fire former det
+  reelt drejer sig om (FB 80, FBA 133, VB 255, load-modul) — og et LIKE-felt,
+  fordi svaret oftest er "som det datasæt der allerede findes". Inde i et PDS og
+  på USS/lokal disk er F7 stadig bare en navneprompt.
+- **Datasetnavne læses som i TSO.** Et navn uden apostroffer er relativt til
+  brugerens egen HLQ, så `TEST.JCL` bliver `IBMUSER.TEST.JCL`; `'SYS1.PARMLIB'`
+  bruges som det står. Det gælder både F7 og F6, og begge dialoger forudfylder
+  derfor med apostroffer — feltet bærer allerede en fuld kvalifikation, som
+  brugeren ikke skal have sat ovenpå.
 - **Filsystem-provider frem for temp-filer.** F3/F4 åbner `mc://LPAR1/BACKUP01`,
   så syntaksfarver, diff, søgning og `Ctrl+S` virker som på en lokal fil. Det
   skrivebeskyttede view bruger sit eget scheme (`mc-view`), fordi VS Code kun

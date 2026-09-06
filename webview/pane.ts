@@ -1,5 +1,5 @@
 import type {
-  EntryDto, ListingDto, PaneId, PaneKind, PaneLocation, ProfileDto, ViewDto,
+  Capabilities, EntryDto, ListingDto, PaneId, PaneKind, PaneLocation, ProfileDto, ViewDto,
 } from '../src/shared/protocol';
 import { VirtualList } from './virtualList';
 
@@ -61,6 +61,11 @@ export class Pane {
 
   get location(): PaneLocation | undefined {
     return this.listing?.location;
+  }
+
+  /** What the provider behind this listing allows — undefined until it arrives. */
+  get capabilities(): Capabilities | undefined {
+    return this.listing?.capabilities;
   }
 
   setActive(active: boolean): void {

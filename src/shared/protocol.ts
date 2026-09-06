@@ -87,6 +87,32 @@ export interface Capabilities {
   submit: boolean;
 }
 
+/**
+ * What F7 needs to allocate an MVS dataset.
+ *
+ * Plain z/OSMF allocation attributes, so the webview can collect them without
+ * knowing anything about Zowe. `like` is the ISPF 3.2 shortcut: when it names an
+ * existing dataset the attributes are copied from it and everything else here is
+ * ignored.
+ */
+export interface DatasetSpec {
+  /** PDS/E, old-style PDS, or sequential. VSAM is not an F7 matter. */
+  type: 'pdse' | 'pds' | 'seq';
+  recfm: string;
+  lrecl: number;
+  blksize?: number;
+  primary: number;
+  secondary: number;
+  alcunit: 'TRK' | 'CYL';
+  /** Directory blocks. Only meaningful for `pds` — a PDS/E grows its own. */
+  dirblk?: number;
+  volser?: string;
+  dataclass?: string;
+  storclass?: string;
+  mgntclass?: string;
+  like?: string;
+}
+
 export interface TransferOptions {
   mode: 'text' | 'binary' | 'auto';
   codepage: string;
@@ -147,7 +173,8 @@ export type ClientMessage =
   | { type: 'move'; from: PaneId; entryIds: string[]; options: TransferOptions }
   | { type: 'rename'; pane: PaneId; entryId: string; newName: string }
   | { type: 'delete'; pane: PaneId; entryIds: string[] }
-  | { type: 'create'; pane: PaneId; name: string }
+  /** `dataset` is filled in only by the MVS allocation dialog. */
+  | { type: 'create'; pane: PaneId; name: string; dataset?: DatasetSpec }
   | { type: 'submit'; pane: PaneId; entryIds: string[] }
   | { type: 'compare'; leftEntryId: string; rightEntryId: string }
   | { type: 'cancelTransfer'; id: string }

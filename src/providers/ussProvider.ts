@@ -140,9 +140,10 @@ export class UssProvider implements PaneProvider {
   }
 
   /** F7 makes a directory; a trailing name without '/' still means a directory here. */
-  async create(loc: PaneLocation, spec: string): Promise<void> {
+  async create(loc: PaneLocation, name: string): Promise<string> {
     const session = await this.sessions.session(loc.profile);
-    await Create.uss(session, join(loc.path, spec), 'directory');
+    await Create.uss(session, join(loc.path, name), 'directory');
+    return name;
   }
 
   async submit(loc: PaneLocation, entries: Entry[]): Promise<string[]> {

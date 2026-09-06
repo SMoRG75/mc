@@ -213,7 +213,7 @@ export class JesProvider implements PaneProvider {
     throw new UserFacingError('Jobs kan ikke omdøbes.');
   }
 
-  async create(): Promise<void> {
+  async create(): Promise<string> {
     throw new UserFacingError('Brug F9 til at submitte et job.');
   }
 

@@ -1,5 +1,5 @@
 import type {
-  Capabilities, ColumnDef, EntryDto, PaneKind, PaneLocation, TransferOptions, ViewDto,
+  Capabilities, ColumnDef, DatasetSpec, EntryDto, PaneKind, PaneLocation, TransferOptions, ViewDto,
 } from '../shared/protocol';
 
 /**
@@ -88,8 +88,18 @@ export interface PaneProvider {
 
   rename(loc: PaneLocation, entry: Entry, newName: string): Promise<void>;
 
-  /** F7: allocate a dataset, make a directory. `spec` is provider-specific. */
-  create(loc: PaneLocation, spec: string): Promise<void>;
+  /**
+   * F7: allocate a dataset, make a directory, create an empty member.
+   *
+   * `dataset` carries the allocation attributes the MVS dialog collected;
+   * providers that have nothing to do with datasets ignore it, and so does the
+   * dataset provider when the pane is inside a PDS.
+   *
+   * Returns the name as it was actually created — not necessarily the one that
+   * was typed, since MVS puts the user's high-level qualifier in front of an
+   * unquoted name.
+   */
+  create(loc: PaneLocation, name: string, dataset?: DatasetSpec): Promise<string>;
 
   /** F9, only where `capabilities().submit` is true. */
   submit?(loc: PaneLocation, entries: Entry[]): Promise<string[]>;

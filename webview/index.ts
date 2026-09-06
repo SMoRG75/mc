@@ -3,7 +3,7 @@ import type {
 } from '../src/shared/protocol';
 import { Pane } from './pane';
 import { Dispatcher, type Action } from './keymap';
-import { modalOpen, prompt, transferDialog } from './dialogs';
+import { datasetDialog, modalOpen, prompt, transferDialog } from './dialogs';
 import { send } from './vscode';
 
 const FKEYS: [string, string][] = [
@@ -229,13 +229,37 @@ class App {
       case 'rename': {
         const entry = pane.cursorEntry;
         if (!entry || entry.kind === 'up') return;
-        const name = await prompt(`Omdøb ${entry.name}`, entry.name);
+        // A whole dataset gets the same TSO reading as an allocation, so the
+        // suggestion is quoted: it is already the complete name.
+        const location = pane.location;
+        const dataset = location?.kind === 'ds' && isDatasetFilter(location.path);
+        const name = await prompt(
+          `Omdøb ${entry.name}`,
+          dataset ? `'${entry.name}'` : entry.name,
+          dataset ? 'Uden apostroffer sættes din bruger på som første kvalifikation.' : '',
+        );
         if (!name) return;
         return send({ type: 'rename', pane: this.active, entryId: entry.id, newName: name });
       }
 
       case 'create': {
-        const name = await prompt('Navn på nyt datasæt / katalog / medlem');
+        const location = pane.location;
+        if (!location || pane.capabilities?.create === false) return;
+
+        // F7 means three different things, and only one of them needs a form:
+        // allocating a dataset is a decision about RECFM, LRECL and space that
+        // cannot be undone afterwards. A member or a directory is just a name.
+        if (location.kind === 'ds' && isDatasetFilter(location.path)) {
+          const allocation = await datasetDialog(highLevelQualifier(location.path));
+          if (!allocation) return;
+          return send({
+            type: 'create', pane: this.active,
+            name: allocation.name, dataset: allocation.spec,
+          });
+        }
+        const name = await prompt(
+          location.kind === 'ds' ? 'Navn på nyt medlem' : 'Navn på nyt katalog',
+        );
         if (!name) return;
         return send({ type: 'create', pane: this.active, name });
       }
@@ -326,6 +350,25 @@ class App {
     const profile = location.profile || (location.kind === 'local' ? 'local' : 'default');
     this.promptLabel.textContent = `${profile}:${location.path || '/'}>`;
   }
+}
+
+/** Same rule as the provider's: a wildcard or an empty path is a filter. */
+function isDatasetFilter(path: string): boolean {
+  return path === '' || path.includes('*') || path.includes('%');
+}
+
+/**
+ * What to put in the name field.
+ *
+ * The filter the pane is showing is nearly always the prefix the new dataset
+ * belongs under, so `IBMUSER.PROD.*` offers `IBMUSER.PROD.` and the user types
+ * the last qualifier. The opening apostrophe is TSO's: without it the host puts
+ * the user's own high-level qualifier in front, which is right when the field is
+ * empty and wrong when it already carries a full prefix.
+ */
+function highLevelQualifier(filter: string): string {
+  const stem = filter.replace(/\.?[*%][^.]*$/, '').replace(/\.$/, '');
+  return stem ? `'${stem}.` : '';
 }
 
 new App(document.getElementById('app') as HTMLElement);

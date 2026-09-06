@@ -224,6 +224,8 @@ body.filtering .pathbar { color: var(--marked); }
   box-shadow: 0 12px 40px rgba(0, 0, 0, .5);
   font-size: 12.5px;
 }
+/* The allocation form carries three fields on some rows and needs the room. */
+.modal.alloc { width: min(600px, 92vw); }
 .modal .mh {
   display: flex;
   justify-content: space-between;
@@ -244,6 +246,8 @@ body.filtering .pathbar { color: var(--marked); }
   color: var(--vscode-descriptionForeground);
   font-size: 11.5px;
 }
+/* Hints line up under the fields — except in dialogs with no label column. */
+.modal .hint.flush { margin-left: 0; }
 .field {
   flex: 1;
   padding: 3px 8px;
@@ -254,6 +258,14 @@ body.filtering .pathbar { color: var(--marked); }
   font-family: var(--vscode-editor-font-family);
 }
 .field.short { max-width: 160px; }
+.field.num { flex: none; width: 74px; }
+.field.mid { flex: none; width: 106px; }
+select.field { flex: none; min-width: 210px; }
+.modal .unit { color: var(--vscode-descriptionForeground); }
+/* The allocation attributes, greyed out as a block when LIKE takes over. */
+.attrs { display: flex; flex-direction: column; gap: 9px; }
+.attrs.disabled { opacity: .45; }
+.modal .row.hidden { display: none; }
 .radio { display: flex; flex-wrap: wrap; gap: 14px; }
 .radio label { display: flex; align-items: center; gap: 5px; }
 .mf {

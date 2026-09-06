@@ -1,7 +1,9 @@
 import { Create, CreateDataSetTypeEnum, Delete, Get, List, Rename, Upload } from '@zowe/zos-files-for-zowe-sdk';
-import type { IZosFilesResponse } from '@zowe/zos-files-for-zowe-sdk';
+import type { ICreateDataSetOptions, IZosFilesResponse } from '@zowe/zos-files-for-zowe-sdk';
 import type { AbstractSession } from '@zowe/imperative';
-import type { Capabilities, ColumnDef, PaneLocation, TransferOptions } from '../shared/protocol';
+import type {
+  Capabilities, ColumnDef, DatasetSpec, PaneLocation, TransferOptions,
+} from '../shared/protocol';
 import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
 import type { SessionManager } from '../zowe/sessions';
 import { describeError, UserFacingError } from '../core/errors';
@@ -259,29 +261,40 @@ export class DsProvider implements PaneProvider {
     }
   }
 
+  /** F6. A new dataset name is read the same way as an allocated one. */
   async rename(loc: PaneLocation, entry: Entry, newName: string): Promise<void> {
     const session = await this.sessions.session(loc.profile);
     const ref = entry.ref as DsRef;
     if (ref.kind === 'member') {
       await Rename.dataSetMember(session, ref.dsname, ref.member, memberName(newName));
     } else {
-      await Rename.dataSet(session, ref.dsname, newName);
+      await Rename.dataSet(session, ref.dsname, datasetName(newName, userPrefix(session)));
     }
   }
 
   /**
    * F7. Inside a PDS this creates an empty member; at filter level it allocates
-   * a dataset, defaulting to a PDS/E with the shape JCL and source normally use.
+   * a dataset from the attributes the dialog collected — or, with no dialog (the
+   * command line), a PDS/E with the shape JCL and source normally use.
    */
-  async create(loc: PaneLocation, spec: string): Promise<void> {
+  async create(loc: PaneLocation, name: string, spec?: DatasetSpec): Promise<string> {
     const session = await this.sessions.session(loc.profile);
     if (!isFilter(loc.path)) {
-      await Upload.bufferToDataSet(session, Buffer.alloc(0), `${loc.path}(${memberName(spec)})`);
-      return;
+      const member = memberName(name);
+      await Upload.bufferToDataSet(session, Buffer.alloc(0), `${loc.path}(${member})`);
+      return member;
     }
-    await Create.dataSet(session, CreateDataSetTypeEnum.DATA_SET_PARTITIONED, spec, {
-      primary: 10, secondary: 5, recfm: 'FB', lrecl: 80, blksize: 27920, dsntype: 'LIBRARY',
-    });
+
+    const prefix = userPrefix(session);
+    const dsname = datasetName(name, prefix);
+    if (spec?.like) {
+      // z/OSMF copies every attribute from the model, so sending our own on top
+      // would only overwrite what the user asked to inherit.
+      await Create.dataSetLike(session, dsname, datasetName(spec.like, prefix), classesOf(spec));
+      return dsname;
+    }
+    await Create.dataSet(session, typeOf(spec), dsname, attributesOf(spec));
+    return dsname;
   }
 
   async submit(loc: PaneLocation, entries: Entry[]): Promise<string[]> {
@@ -321,6 +334,106 @@ function explainListFailure(err: unknown, filter: string): UserFacingError {
     + "eller sæt et fast udgangspunkt i indstillingen 'mc.ds.defaultFilter'.\n\n"
     + `${message}\n${detail ?? ''}`.trim(),
   );
+}
+
+/* ------------------------------------------------------------------ */
+/* F7 allocation                                                       */
+/* ------------------------------------------------------------------ */
+
+/** Half a 3390 track: the block size everyone has used since the 1990s. */
+const HALF_TRACK = 27998;
+
+function typeOf(spec: DatasetSpec | undefined): CreateDataSetTypeEnum {
+  return spec?.type === 'seq'
+    ? CreateDataSetTypeEnum.DATA_SET_SEQUENTIAL
+    : CreateDataSetTypeEnum.DATA_SET_PARTITIONED;
+}
+
+/**
+ * The dialog's fields as z/OSMF allocation attributes.
+ *
+ * Only what the user actually decided is sent; Zowe fills the rest in from its
+ * defaults for the chosen type. The two things worth knowing: a sequential
+ * dataset must not carry `dirblk` at all (z/OSMF rejects the combination), and
+ * an empty block size is computed rather than left to a default that may not be
+ * a multiple of the record length.
+ */
+function attributesOf(spec: DatasetSpec | undefined): Partial<ICreateDataSetOptions> {
+  if (!spec) {
+    return {
+      primary: 10, secondary: 5, recfm: 'FB', lrecl: 80, blksize: 27920, dsntype: 'LIBRARY',
+    };
+  }
+  const recfm = spec.recfm.trim().toUpperCase() || 'FB';
+  return {
+    ...classesOf(spec),
+    alcunit: spec.alcunit,
+    primary: spec.primary,
+    secondary: spec.secondary,
+    recfm,
+    lrecl: spec.lrecl,
+    blksize: spec.blksize && spec.blksize > 0 ? spec.blksize : blockSize(recfm, spec.lrecl),
+    ...(spec.type === 'seq' ? {} : { dirblk: spec.type === 'pdse' ? 1 : (spec.dirblk || 20) }),
+    ...(spec.type === 'pdse' ? { dsntype: 'LIBRARY' } : {}),
+  };
+}
+
+/** The SMS classes and the volume — the fields that also make sense with LIKE. */
+function classesOf(spec: DatasetSpec): Partial<ICreateDataSetOptions> {
+  const set = (value: string | undefined) => (value?.trim() ? value.trim().toUpperCase() : undefined);
+  return {
+    ...(set(spec.volser) ? { volser: set(spec.volser) } : {}),
+    ...(set(spec.dataclass) ? { dataclass: set(spec.dataclass) } : {}),
+    ...(set(spec.storclass) ? { storclass: set(spec.storclass) } : {}),
+    ...(set(spec.mgntclass) ? { mgntclass: set(spec.mgntclass) } : {}),
+  };
+}
+
+/** The largest sensible block for this record format, the way ISPF picks one. */
+function blockSize(recfm: string, lrecl: number): number {
+  if (recfm.startsWith('U')) return 32760;
+  if (recfm.startsWith('V')) return Math.min(32760, Math.max(HALF_TRACK, lrecl + 4));
+  if (lrecl <= 0 || lrecl > HALF_TRACK) return Math.max(lrecl, 1);
+  return Math.floor(HALF_TRACK / lrecl) * lrecl;
+}
+
+/** The user's own high-level qualifier — TSO's prefix for unquoted names. */
+function userPrefix(session: AbstractSession): string {
+  return (session.ISession?.user ?? '').trim().toUpperCase();
+}
+
+/**
+ * TSO's naming rule, and then the syntax check z/OSMF only answers with a rule
+ * number for.
+ *
+ * A name in apostrophes is the whole name; anything else is relative to the
+ * user's own high-level qualifier, so `TEST.JCL` allocates `IBMUSER.TEST.JCL`
+ * exactly as it would under ISPF. The closing apostrophe is optional — the
+ * dialog prefills an opening one and the user types onto the end of it.
+ *
+ * The rest is the format: up to 22 qualifiers of 1-8 characters, 44 in total,
+ * no leading digit. The mistakes are always a too-long qualifier or a stray
+ * wildcard left over from the pane filter.
+ */
+function datasetName(raw: string, prefix: string): string {
+  const typed = raw.trim();
+  const bare = typed.replace(/^'/, '').replace(/'$/, '').trim();
+  const fullyQualified = typed.startsWith("'") || !prefix;
+  const name = (fullyQualified ? bare : `${prefix}.${bare}`).toUpperCase();
+  const qualifiers = name.split('.');
+  const valid = name.length > 0 && name.length <= 44
+    && qualifiers.length <= 22
+    && qualifiers.every((q) => /^[A-Z$#@][A-Z0-9$#@-]{0,7}$/.test(q));
+  if (!valid) {
+    throw new UserFacingError(
+      `'${name}' er ikke et gyldigt datasætnavn.`,
+      'Et navn er op til 22 kvalifikatorer adskilt af punktum, hver på 1-8 tegn '
+      + '(A-Z, 0-9, @ # $ -, første tegn ikke et ciffer), og højst 44 tegn i alt.'
+      + (fullyQualified ? '' : `\n\n'${raw}' blev læst som ${name}, fordi navnet `
+        + 'ikke står i apostroffer. Sæt en apostrof foran for at bruge det som det står.'),
+    );
+  }
+  return name;
 }
 
 /** A path with a wildcard (or empty) is a filter; anything else names one dataset. */

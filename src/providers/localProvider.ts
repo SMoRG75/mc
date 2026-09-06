@@ -118,8 +118,9 @@ export class LocalProvider implements PaneProvider {
     await fs.rename(ref.fullPath, path.join(path.dirname(ref.fullPath), newName));
   }
 
-  async create(loc: PaneLocation, spec: string): Promise<void> {
-    await fs.mkdir(path.join(loc.path, spec), { recursive: false });
+  async create(loc: PaneLocation, name: string): Promise<string> {
+    await fs.mkdir(path.join(loc.path, name), { recursive: false });
+    return name;
   }
 }
 
