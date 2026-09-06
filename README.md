@@ -85,6 +85,17 @@ special case, just `source.read()` followed by `target.write()`.
   for sites with a page of their own. It applies to every direction: F3/F4 read
   with it, Ctrl+S writes with it, and F5 uses it at both ends — a file read in
   one codepage and written back in another is how national characters get lost.
+- **`Shift+F3` decodes the bytes here, not on the host.** F3 asks z/OSMF for a
+  conversion, which only works for content the host agrees is text. A load
+  module, a data set read in binary, or an EBCDIC file that was FTP'd down to
+  the PC has no service left to convert it — so `Shift+F3` fetches the raw bytes
+  and translates them locally, using IBM's own CDRA tables in
+  [`src/core/ebcdic.ts`](src/core/ebcdic.ts). Records come out one per line:
+  split on x'15' when the bytes carry one, otherwise on the data set's LRECL
+  (`mc.view.ebcdicRecordLength` when there is none). The page is
+  `mc.view.ebcdicCodepage`, falling back to the transfer codepage, and it is in
+  the tab title — the same bytes are equally valid as IBM-037 and as IBM-277,
+  so which one you chose is part of what you are looking at.
 - **`longLines: 'abort'` by default.** A 132-character line going into FB 80 is
   the classic way to ruin an upload. The user has to choose wrap or truncate
   deliberately.

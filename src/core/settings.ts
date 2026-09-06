@@ -16,6 +16,12 @@ export const settings = {
   jesOwner: (): string => settings.get('jes.owner', ''),
   dsDefaultFilter: (): string => settings.get('ds.defaultFilter', ''),
   jesRefreshSeconds: (): number => settings.get('jes.autoRefreshSeconds', 10),
+  ebcdicRecordLength: (): number => settings.get('view.ebcdicRecordLength', 80),
+
+  /** What Shift+F3 decodes with — the transfer codepage unless one is set here. */
+  ebcdicCodepage: (): string => (
+    settings.get('view.ebcdicCodepage', '').trim() || settings.transferDefaults().codepage
+  ),
 
   transferDefaults: (): TransferOptions => ({
     mode: settings.get('transfer.defaultMode', 'auto'),

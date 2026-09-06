@@ -73,6 +73,15 @@ export interface PaneProvider {
   describe(loc: PaneLocation, entry: Entry): SourceItem;
 
   /**
+   * The entry's record length, where the world it lives in has one.
+   *
+   * Only Shift+F3 asks: bytes read raw out of a fixed-record dataset carry no
+   * newline to split on, so the record length is the only thing that says where
+   * one line ends. USS and local disk have none and leave this out.
+   */
+  recordLength?(loc: PaneLocation, entry: Entry): number | undefined;
+
+  /**
    * Reads an entry whole. Large files should go through `readStream` instead.
    *
    * `options` carries the codepage the host content has to be converted from —

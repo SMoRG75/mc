@@ -4,8 +4,8 @@ import type {
 } from './shared/protocol';
 import type { Entry, PaneProvider, ProviderRegistry } from './core/provider';
 import { TransferQueue, type TransferRequest } from './core/transferQueue';
-import { EditorBridge } from './core/editorBridge';
-import { describeError } from './core/errors';
+import { EditorBridge, type OpenMode } from './core/editorBridge';
+import { describeError, UserFacingError } from './core/errors';
 import { settings } from './core/settings';
 import type { SessionManager } from './zowe/sessions';
 
@@ -249,22 +249,34 @@ export class CommanderPanel {
     }
   }
 
-  private async openInEditor(pane: PaneId, entryId: string, mode: 'view' | 'edit'): Promise<void> {
+  private async openInEditor(pane: PaneId, entryId: string, mode: OpenMode): Promise<void> {
     const state = this.panes[pane];
     const entry = this.entry(pane, entryId);
 
-    if (state.location.kind === 'local') {
+    // Shift+F3 has to go through the bridge even on local disk: the point of it
+    // is that nothing but the bridge is allowed to interpret the bytes.
+    if (state.location.kind === 'local' && mode !== 'ebcdic') {
       const document = await vscode.workspace.openTextDocument(vscode.Uri.file(entryId));
       await vscode.window.showTextDocument(document, { preview: mode === 'view' });
       return;
     }
+    if (mode === 'ebcdic' && state.location.kind === 'jes') {
+      throw new UserFacingError(
+        'Spool output is already converted before it leaves JES.',
+        'There are no EBCDIC bytes left to decode here — F3 shows the same content as text.',
+      );
+    }
 
+    const name = this.provider(pane).describe(state.location, entry).name;
     const uri = EditorBridge.uri(
-      state.location, entryId, this.provider(pane).describe(state.location, entry).name,
-      mode === 'view',
+      state.location, entryId,
+      // The page is in the tab title because it is a decision, not a property of
+      // the file: the same bytes read as IBM-037 and as IBM-277 are both valid.
+      mode === 'ebcdic' ? `${name} [${settings.ebcdicCodepage()}]` : name,
+      mode,
     );
     const document = await vscode.workspace.openTextDocument(uri);
-    await vscode.window.showTextDocument(document, { preview: mode === 'view' });
+    await vscode.window.showTextDocument(document, { preview: mode !== 'edit' });
   }
 
   private async transfer(
@@ -357,11 +369,11 @@ export class CommanderPanel {
   private async compare(leftEntryId: string, rightEntryId: string): Promise<void> {
     const left = EditorBridge.uri(
       this.panes.left.location, leftEntryId,
-      this.entry('left', leftEntryId).dto.name, true,
+      this.entry('left', leftEntryId).dto.name, 'view',
     );
     const right = EditorBridge.uri(
       this.panes.right.location, rightEntryId,
-      this.entry('right', rightEntryId).dto.name, true,
+      this.entry('right', rightEntryId).dto.name, 'view',
     );
     await vscode.commands.executeCommand('vscode.diff', left, right, 'Mainframe Commander: compare');
   }

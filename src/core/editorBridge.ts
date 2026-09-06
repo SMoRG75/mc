@@ -2,9 +2,20 @@ import * as vscode from 'vscode';
 import type { PaneLocation, TransferOptions } from '../shared/protocol';
 import type { ProviderRegistry } from './provider';
 import { describeError } from './errors';
+import { ebcdicToText } from './ebcdic';
 
 export const SCHEME_EDIT = 'mc';
 export const SCHEME_VIEW = 'mc-view';
+/** Shift+F3: raw bytes, decoded here rather than by z/OSMF. Read-only, like mc-view. */
+export const SCHEME_EBCDIC = 'mc-ebcdic';
+
+export type OpenMode = 'view' | 'edit' | 'ebcdic';
+
+/** What Shift+F3 needs and a transfer does not: which page, and how long a record. */
+export interface EbcdicSettings {
+  codepage: () => string;
+  recordLength: () => number;
+}
 
 interface Target {
   location: PaneLocation;
@@ -27,17 +38,22 @@ export class EditorBridge implements vscode.FileSystemProvider {
   constructor(
     private readonly providers: ProviderRegistry,
     private readonly transferDefaults: () => TransferOptions,
+    private readonly ebcdic: EbcdicSettings,
   ) {}
 
   static register(
     context: vscode.ExtensionContext,
     providers: ProviderRegistry,
     transferDefaults: () => TransferOptions,
+    ebcdic: EbcdicSettings,
   ): EditorBridge {
-    const bridge = new EditorBridge(providers, transferDefaults);
+    const bridge = new EditorBridge(providers, transferDefaults, ebcdic);
     context.subscriptions.push(
       vscode.workspace.registerFileSystemProvider(SCHEME_EDIT, bridge, { isCaseSensitive: true }),
       vscode.workspace.registerFileSystemProvider(SCHEME_VIEW, bridge, {
+        isCaseSensitive: true, isReadonly: true,
+      }),
+      vscode.workspace.registerFileSystemProvider(SCHEME_EBCDIC, bridge, {
         isCaseSensitive: true, isReadonly: true,
       }),
     );
@@ -49,9 +65,9 @@ export class EditorBridge implements vscode.FileSystemProvider {
    * even after the pane has moved on: `mc://LPAR1/IBMUSER.PROD.JCL(BACKUP01)`
    * with the pane location in the query.
    */
-  static uri(location: PaneLocation, entryId: string, name: string, readonly: boolean): vscode.Uri {
+  static uri(location: PaneLocation, entryId: string, name: string, mode: OpenMode): vscode.Uri {
     return vscode.Uri.from({
-      scheme: readonly ? SCHEME_VIEW : SCHEME_EDIT,
+      scheme: mode === 'edit' ? SCHEME_EDIT : mode === 'view' ? SCHEME_VIEW : SCHEME_EBCDIC,
       authority: location.profile || '_',
       path: `/${name}`,
       query: JSON.stringify({ kind: location.kind, path: location.path, entryId } satisfies QueryShape),
@@ -77,14 +93,29 @@ export class EditorBridge implements vscode.FileSystemProvider {
   async readFile(uri: vscode.Uri): Promise<Uint8Array> {
     const target = this.parse(uri);
     const provider = this.providers.get(target.location.kind);
+    const options = this.transferDefaults();
     try {
       const listing = await provider.list(target.location, new AbortController().signal);
       const entry = listing.entries.find((e) => e.dto.id === target.entryId);
       if (!entry) throw vscode.FileSystemError.FileNotFound(uri);
+
+      if (uri.scheme === SCHEME_EBCDIC) {
+        // 'binary' is the whole point here: the bytes have to arrive unconverted
+        // for there to be anything left to decode.
+        const raw = await provider.read(
+          target.location, entry, { ...options, mode: 'binary' }, new AbortController().signal,
+        );
+        const lrecl = provider.recordLength?.(target.location, entry);
+        return Buffer.from(
+          ebcdicToText(raw, this.ebcdic.codepage(), lrecl ?? this.ebcdic.recordLength()),
+          'utf8',
+        );
+      }
+
       // Same options as a save and as F5: the codepage a file is read with has
       // to be the one it is written back with.
       return await provider.read(
-        target.location, entry, this.transferDefaults(), new AbortController().signal,
+        target.location, entry, options, new AbortController().signal,
       );
     } catch (err) {
       throw toFileSystemError(err, uri);

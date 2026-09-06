@@ -19,7 +19,7 @@ export interface DsSettings {
 /** A pane on MVS datasets: a filter listing at the top level, members inside a PDS. */
 type DsRef =
   | { kind: 'dataset'; dsname: string; dsorg?: string; recfm?: string; lrecl?: string; migrated: boolean }
-  | { kind: 'member'; dsname: string; member: string };
+  | { kind: 'member'; dsname: string; member: string; lrecl?: string };
 
 const DATASET_COLUMNS: ColumnDef[] = [
   { id: 'name', title: 'Dataset', width: 40 },
@@ -157,7 +157,10 @@ export class DsProvider implements PaneProvider {
     const limit = this.settings.pageSize();
 
     const entries: Entry<DsRef>[] = items.slice(0, limit).map((item) => ({
-      ref: { kind: 'member', dsname, member: item.member },
+      // The LRECL is the PDS's, not the member's, and it is what Shift+F3 has to
+      // split raw records on — so it travels with every member rather than
+      // costing a second listing later.
+      ref: { kind: 'member', dsname, member: item.member, lrecl: attributes?.lrecl },
       dto: {
         id: `${dsname}(${item.member})`,
         name: item.member,
@@ -214,6 +217,11 @@ export class DsProvider implements PaneProvider {
     const ref = entry.ref as DsRef;
     // Datasets hold records, not bytes: they are always text unless the user says otherwise.
     return { name: ref.kind === 'member' ? ref.member : ref.dsname, size: entry.dto.size, text: true };
+  }
+
+  recordLength(_loc: PaneLocation, entry: Entry): number | undefined {
+    const lrecl = Number((entry.ref as DsRef).lrecl);
+    return Number.isFinite(lrecl) && lrecl > 0 ? lrecl : undefined;
   }
 
   /**

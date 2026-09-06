@@ -20,6 +20,7 @@
       { "command": "mc.open", "key": "ctrl+shift+m", "mac": "cmd+shift+m" },
 
       { "command": "mc.key", "args": { "key": "F3" }, "key": "f3", "when": "activeWebviewPanelId == mainframeCommander" },
+      { "command": "mc.key", "args": { "key": "Shift+F3" }, "key": "shift+f3", "when": "activeWebviewPanelId == mainframeCommander" },
       { "command": "mc.key", "args": { "key": "F4" }, "key": "f4", "when": "activeWebviewPanelId == mainframeCommander" },
       { "command": "mc.key", "args": { "key": "F5" }, "key": "f5", "when": "activeWebviewPanelId == mainframeCommander" },
       { "command": "mc.key", "args": { "key": "Shift+F5" }, "key": "shift+f5", "when": "activeWebviewPanelId == mainframeCommander" },
@@ -95,6 +96,17 @@
           "minimum": 1,
           "maximum": 10,
           "description": "How many transfers run at the same time."
+        },
+        "mc.view.ebcdicCodepage": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "EBCDIC page `Shift+F3` decodes with. Empty means `#mc.transfer.codepage#`. Only single-byte EBCDIC pages can be decoded here — set this when your transfer codepage is `UTF-8` or `ISO8859-1`."
+        },
+        "mc.view.ebcdicRecordLength": {
+          "type": "number",
+          "default": 80,
+          "minimum": 1,
+          "markdownDescription": "Record length `Shift+F3` splits on when the bytes carry no x'15' newline of their own — a data set read as records rather than as a stream. The data set's own LRECL is used when it is known; this only decides the case where it is not, such as a local file."
         },
         "mc.confirmDelete": {
           "type": "boolean",

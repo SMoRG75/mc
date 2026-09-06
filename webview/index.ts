@@ -6,8 +6,11 @@ import { Dispatcher, type Action } from './keymap';
 import { datasetDialog, modalOpen, prompt, transferDialog } from './dialogs';
 import { send } from './vscode';
 
-const FKEYS: [string, string][] = [
-  ['F3', 'View'], ['F4', 'Edit'], ['F5', 'Copy'], ['F6', 'Rename'],
+const FKEYS: [key: string, label: string, hint?: string][] = [
+  ['F3', 'View', 'Shift+F3 shows the raw bytes decoded as EBCDIC'],
+  ['F4', 'Edit'],
+  ['F5', 'Copy', 'Shift+F5 copies without the dialog'],
+  ['F6', 'Rename'],
   ['F7', 'Create'], ['F8', 'Delete'], ['F9', 'Submit'], ['F10', 'Compare'],
 ];
 
@@ -90,10 +93,11 @@ class App {
   private fkeyBar(): HTMLElement {
     const bar = document.createElement('div');
     bar.className = 'fkeys';
-    bar.append(...FKEYS.map(([key, label]) => {
+    bar.append(...FKEYS.map(([key, label, hint]) => {
       const button = document.createElement('button');
       button.className = 'fk';
       button.innerHTML = `<b>${key}</b>${label}`;
+      if (hint) button.title = hint;
       // Clicking the bar must not take the keyboard away from the pane —
       // otherwise the next Enter presses the button again.
       button.addEventListener('mousedown', (event) => event.preventDefault());
@@ -204,13 +208,12 @@ class App {
       }
 
       case 'view':
+      case 'viewEbcdic':
       case 'edit': {
         const entry = pane.cursorEntry;
         if (!entry || entry.kind === 'up') return;
-        return send({
-          type: 'open', pane: this.active, entryId: entry.id,
-          mode: action === 'view' ? 'view' : 'edit',
-        });
+        const mode = action === 'view' ? 'view' : action === 'edit' ? 'edit' : 'ebcdic';
+        return send({ type: 'open', pane: this.active, entryId: entry.id, mode });
       }
 
       case 'copy':

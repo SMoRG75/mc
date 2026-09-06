@@ -25,7 +25,10 @@ export function activate(context: vscode.ExtensionContext): void {
   }));
   providers.register(new JesProvider(sessions, { defaultOwner: settings.jesOwner }));
 
-  EditorBridge.register(context, providers, settings.transferDefaults);
+  EditorBridge.register(context, providers, settings.transferDefaults, {
+    codepage: settings.ebcdicCodepage,
+    recordLength: settings.ebcdicRecordLength,
+  });
 
   context.subscriptions.push(
     vscode.commands.registerCommand('mc.open', () => {

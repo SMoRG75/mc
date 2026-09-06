@@ -10,7 +10,7 @@
 export type Action =
   | 'up' | 'down' | 'pageUp' | 'pageDown' | 'home' | 'end'
   | 'enter' | 'parent' | 'switchPane' | 'mark' | 'markAll' | 'invertMark'
-  | 'view' | 'edit' | 'copy' | 'copyNoDialog' | 'rename' | 'create'
+  | 'view' | 'viewEbcdic' | 'edit' | 'copy' | 'copyNoDialog' | 'rename' | 'create'
   | 'delete' | 'submit' | 'compare' | 'refresh' | 'swapPanes' | 'focusCommandLine'
   | 'quickFilter' | 'cancel' | 'nextView';
 
@@ -27,6 +27,7 @@ const BINDINGS: Record<string, Action> = {
   Insert: 'mark',
   ' ': 'mark',
   F3: 'view',
+  'Shift+F3': 'viewEbcdic',
   F4: 'edit',
   F5: 'copy',
   'Shift+F5': 'copyNoDialog',

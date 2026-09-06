@@ -175,7 +175,8 @@ export type ClientMessage =
   | { type: 'enter'; pane: PaneId; entryId: string }
   | { type: 'up'; pane: PaneId }
   | { type: 'refresh'; pane: PaneId }
-  | { type: 'open'; pane: PaneId; entryId: string; mode: 'view' | 'edit' }
+  /** `ebcdic` is Shift+F3: the raw bytes, decoded locally instead of by z/OSMF. */
+  | { type: 'open'; pane: PaneId; entryId: string; mode: 'view' | 'edit' | 'ebcdic' }
   | { type: 'copy'; from: PaneId; entryIds: string[]; options: TransferOptions }
   | { type: 'move'; from: PaneId; entryIds: string[]; options: TransferOptions }
   | { type: 'rename'; pane: PaneId; entryId: string; newName: string }
