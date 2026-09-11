@@ -119,6 +119,15 @@ export class Pane {
     this.profileSelect.value = name;
   }
 
+  /**
+   * Points the pane at another world — what the header tabs do, and what
+   * Alt+1..4 do. Both go through here so the keyboard cannot drift away from
+   * what the tabs mean: the top of that world, with the profile kept.
+   */
+  showKind(kind: PaneKind): void {
+    this.navigate({ kind, path: '' });
+  }
+
   setBusy(busy: boolean): void {
     this.element.classList.toggle('busy', busy);
   }
@@ -302,7 +311,7 @@ export class Pane {
       const tab = document.createElement('span');
       tab.textContent = label;
       if (kind === current) tab.className = 'on';
-      tab.addEventListener('click', () => this.navigate({ kind, path: '' }));
+      tab.addEventListener('click', () => this.showKind(kind));
       return tab;
     }));
   }

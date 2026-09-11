@@ -235,6 +235,15 @@ class App {
       case 'quickFilter': return this.enterFilter();
       case 'focusCommandLine': return this.commandInput.focus();
 
+      // Alt+1..4, on the pane the cursor is in. Same thing as clicking the tab,
+      // so pressing the one the pane is already on goes back to the top of it —
+      // and the cursor history brings the old row back when you switch away and
+      // return.
+      case 'kindLocal': return pane.showKind('local');
+      case 'kindDs': return pane.showKind('ds');
+      case 'kindUss': return pane.showKind('uss');
+      case 'kindJes': return pane.showKind('jes');
+
       case 'enter': {
         const entry = pane.cursorEntry;
         if (!entry) return;

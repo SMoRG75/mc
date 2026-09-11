@@ -12,7 +12,8 @@ export type Action =
   | 'enter' | 'parent' | 'switchPane' | 'mark' | 'markAll' | 'invertMark'
   | 'view' | 'viewEbcdic' | 'edit' | 'copy' | 'copyNoDialog' | 'rename' | 'create'
   | 'delete' | 'submit' | 'compare' | 'refresh' | 'swapPanes' | 'focusCommandLine'
-  | 'quickFilter' | 'cancel' | 'nextView';
+  | 'quickFilter' | 'cancel' | 'nextView'
+  | 'kindLocal' | 'kindDs' | 'kindUss' | 'kindJes';
 
 const BINDINGS: Record<string, Action> = {
   ArrowUp: 'up',
@@ -44,6 +45,11 @@ const BINDINGS: Record<string, Action> = {
   'Ctrl+s': 'quickFilter',
   'Ctrl+j': 'nextView',
   Escape: 'cancel',
+  // The four tabs in the pane header, in the order they are drawn.
+  'Alt+1': 'kindLocal',
+  'Alt+2': 'kindDs',
+  'Alt+3': 'kindUss',
+  'Alt+4': 'kindJes',
 };
 
 /** Normalised name, matching what package.json forwards ("Shift+F5"). */
