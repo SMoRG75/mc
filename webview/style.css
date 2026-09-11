@@ -293,6 +293,52 @@ select.field { flex: none; min-width: 210px; }
 .radio { display: flex; flex-wrap: wrap; gap: 14px; }
 .radio label { display: flex; align-items: center; gap: 5px; }
 
+/* ---------- shortcuts (F1) ---------- */
+/* Two columns, because the whole point is seeing the lot without scrolling —
+   the panel is short, and a list this long would otherwise be a page to page
+   through rather than a card to glance at. */
+.modal.help { width: min(760px, 94vw); }
+.modal.help .mb {
+  display: block;
+  columns: 2;
+  column-gap: 26px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+/* Column flow rather than a two-by-three grid: the sections are different
+   heights, and a grid would line their tops up and leave the holes in between. */
+.modal.help section { break-inside: avoid; margin: 0 0 13px; }
+.modal.help h4 {
+  margin: 0 0 5px;
+  color: var(--vscode-textLink-foreground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+/* The key column is fixed so every key in the dialog lines up, whichever
+   section it is in; the description wraps in what is left. */
+.modal.help dl {
+  display: grid;
+  grid-template-columns: 108px 1fr;
+  gap: 3px 10px;
+  margin: 0;
+}
+.modal.help dt {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11.5px;
+  color: var(--marked);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.modal.help dd { margin: 0; }
+.modal.help .hint { margin: 7px 0 0; }
+
+@media (max-width: 620px) {
+  .modal.help .mb { columns: 1; }
+}
+
 /* ---------- saved views (Ctrl+D) ---------- */
 .favlist {
   display: flex;

@@ -5,12 +5,13 @@ import type {
 import { Pane } from './pane';
 import { Dispatcher, type Action } from './keymap';
 import {
-  datasetDialog, favouritesDialog, filterDialog, modalOpen, prompt, transferDialog,
+  datasetDialog, favouritesDialog, filterDialog, helpDialog, modalOpen, prompt, transferDialog,
 } from './dialogs';
 import { setHostWorking, setTransfersRunning } from './progress';
 import { send } from './vscode';
 
 const FKEYS: [key: string, label: string, hint?: string][] = [
+  ['F1', 'Help', 'Every shortcut there is — including the ones this bar has no room for'],
   ['F2', 'Refresh', 'Saving a member in the editor refreshes the pane on its own'],
   ['F3', 'View', 'Shift+F3 shows the raw bytes decoded as EBCDIC'],
   ['F4', 'Edit'],
@@ -252,6 +253,10 @@ class App {
       case 'focusCommandLine': return this.commandInput.focus();
       case 'editFilter': return this.editFilter();
       case 'favourites': return this.showFavourites();
+      case 'help': {
+        await helpDialog();
+        return;
+      }
 
       // Alt+1..4, on the pane the cursor is in, and the same thing as clicking
       // the tab: back to where the pane last was in that world, or to the top

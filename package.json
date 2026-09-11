@@ -55,6 +55,14 @@
       {
         "command": "mc.key",
         "args": {
+          "key": "F1"
+        },
+        "key": "f1",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
           "key": "F3"
         },
         "key": "f3",

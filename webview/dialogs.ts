@@ -1,6 +1,7 @@
 import type {
   DatasetSpec, FavouriteDto, FilterDto, PaneLocation, TransferOptions,
 } from '../src/shared/protocol';
+import { SHORTCUTS } from './keymap';
 
 let openCount = 0;
 
@@ -125,6 +126,37 @@ export function filterDialog(spec: FilterDto): Promise<Record<string, string> | 
     });
     // The field is nearly always being replaced rather than edited.
     queueMicrotask(() => (box.querySelector('input') as HTMLInputElement | null)?.select());
+    return box;
+  });
+}
+
+/**
+ * F1: every shortcut there is, on one screen.
+ *
+ * The F-key bar along the bottom only has room for the nine keys it shows, and
+ * the ones that are worth the most here — Ctrl+F, Ctrl+D, Alt+1..4 — are exactly
+ * the ones it cannot show. There is nothing to fill in: the Close button holds
+ * the keyboard, so Enter and Space close it as readily as Escape does.
+ */
+export function helpDialog(): Promise<undefined> {
+  return modal<undefined>((resolve) => {
+    const box = document.createElement('div');
+    box.className = 'help';
+    box.innerHTML = `
+      <div class="mh">Shortcuts<span>F1</span></div>
+      <div class="mb">
+        ${SHORTCUTS.map((section) => `
+          <section>
+            <h4>${escapeHtml(section.title)}</h4>
+            <dl>${section.rows.map(([keys, what]) => `
+              <dt>${escapeHtml(keys)}</dt><dd>${escapeHtml(what)}</dd>`).join('')}</dl>
+            ${section.note ? `<p class="hint flush">${escapeHtml(section.note)}</p>` : ''}
+          </section>`).join('')}
+      </div>
+      <div class="mf">
+        <button class="btn pri" data-close>Close</button>
+      </div>`;
+    box.querySelector('[data-close]')?.addEventListener('click', () => resolve(undefined));
     return box;
   });
 }

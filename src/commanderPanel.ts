@@ -45,7 +45,7 @@ interface PaneState {
   /**
    * A remembered cursor waiting to be handed back, cleared once it has been.
    * Set only when the pane moves: a plain refresh must not carry one, or
-   * Ctrl+R would yank the cursor back from wherever the user had moved it.
+   * F2 would yank the cursor back from wherever the user had moved it.
    */
   restore?: string;
   /** Cancels the in-flight listing when the user navigates away from it. */
