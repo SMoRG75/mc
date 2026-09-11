@@ -4,6 +4,7 @@ import type {
 import { Pane } from './pane';
 import { Dispatcher, type Action } from './keymap';
 import { datasetDialog, modalOpen, prompt, transferDialog } from './dialogs';
+import { setHostWorking, setTransfersRunning } from './progress';
 import { send } from './vscode';
 
 const FKEYS: [key: string, label: string, hint?: string][] = [
@@ -153,6 +154,9 @@ class App {
       case 'busy':
         this.panes[message.pane].setBusy(message.busy);
         break;
+      case 'working':
+        setHostWorking(message.working);
+        break;
       case 'error':
         // A message with no pane comes from something that spans both — compare,
         // a cancelled transfer. Dropping those was how F10 could fail in silence;
@@ -177,6 +181,9 @@ class App {
   private renderTransfers(jobs: TransferJobDto[]): void {
     const running = jobs.filter((job) => job.state === 'running' || job.state === 'queued');
     const failed = jobs.filter((job) => job.state === 'failed');
+    // A transfer outlives the message that started it, so the queue is the one
+    // that has to keep the pointer waiting for as long as bytes are moving.
+    setTransfersRunning(running.length > 0);
     this.statusBar.replaceChildren();
 
     if (running.length > 0) {

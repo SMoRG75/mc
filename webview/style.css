@@ -294,3 +294,13 @@ select.field { flex: none; min-width: 210px; }
   border-color: transparent;
   font-weight: 600;
 }
+
+/* ---------- work in progress ---------- */
+/*
+ * `progress` rather than `wait`: the panel stays usable while a listing or a
+ * transfer runs, and an hourglass would say otherwise. Keep this rule last —
+ * it has to win over the cursors the controls above set for themselves, and it
+ * does that on source order, not on weight.
+ */
+body.working,
+body.working * { cursor: progress; }

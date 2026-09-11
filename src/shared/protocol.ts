@@ -159,6 +159,12 @@ export type HostMessage =
   }
   | { type: 'listing'; pane: PaneId; listing: ListingDto }
   | { type: 'busy'; pane: PaneId; busy: boolean }
+  /**
+   * Whether the host is still working on something the user asked for. Unlike
+   * `busy` this is not about one pane: it is what the pointer shows, and the
+   * point of it is that the host knows when the work is actually over.
+   */
+  | { type: 'working'; working: boolean }
   | { type: 'error'; pane: PaneId | null; message: string; detail?: string }
   | { type: 'transfers'; jobs: TransferJobDto[] }
   | { type: 'profiles'; profiles: ProfileDto[] }
@@ -199,3 +205,16 @@ export type ClientMessage =
   | { type: 'cursor'; pane: PaneId; location: PaneLocation; entryId: string }
   | { type: 'cancelTransfer'; id: string }
   | { type: 'commandLine'; pane: PaneId; line: string };
+
+/**
+ * Whether a message is work the user is waiting for, and so should be shown as
+ * happening. Both sides ask this: the webview to put the pointer in its waiting
+ * state the moment it sends, the host to say when to take it back again. They
+ * have to agree, or a pointer set on the way out is never cleared.
+ *
+ * Only the debounced cursor report is not: it is bookkeeping the user never
+ * asked for and cannot tell has happened.
+ */
+export function reportsProgress(type: ClientMessage['type']): boolean {
+  return type !== 'cursor';
+}

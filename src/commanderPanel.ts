@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
-import type {
-  ClientMessage, HostMessage, PaneId, PaneLocation, TransferJobDto, TransferOptions,
+import {
+  reportsProgress,
+  type ClientMessage, type HostMessage, type PaneId, type PaneLocation,
+  type TransferJobDto, type TransferOptions,
 } from './shared/protocol';
 import type { Entry, PaneProvider, ProviderRegistry } from './core/provider';
 import { TransferQueue, type TransferRequest } from './core/transferQueue';
@@ -58,6 +60,12 @@ export class CommanderPanel {
   private jesTimer?: NodeJS.Timeout;
   /** The last state written, so a JES pane refreshing itself does not rewrite it. */
   private remembered = '';
+  /**
+   * How many things the user is waiting for. A count rather than a flag: F5 on
+   * top of a listing that is still running is two, and the pointer goes back to
+   * normal when the last of them is done, not when the first one is.
+   */
+  private working = 0;
 
   static show(
     context: vscode.ExtensionContext,
@@ -141,6 +149,10 @@ export class CommanderPanel {
   /* ---------------------------------------------------------------- */
 
   private async handle(msg: ClientMessage): Promise<void> {
+    // Everything below is awaited, so this is also where the work ends — which
+    // is the only place that can honestly say the pointer may go back.
+    const progress = reportsProgress(msg.type);
+    if (progress && this.working++ === 0) this.post({ type: 'working', working: true });
     try {
       switch (msg.type) {
         case 'ready':
@@ -251,6 +263,8 @@ export class CommanderPanel {
     } catch (err) {
       const { message, detail } = describeError(err);
       this.post({ type: 'error', pane: 'pane' in msg ? msg.pane : null, message, detail });
+    } finally {
+      if (progress && --this.working === 0) this.post({ type: 'working', working: false });
     }
   }
 
