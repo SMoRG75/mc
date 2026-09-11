@@ -12,7 +12,7 @@ export type Action =
   | 'enter' | 'parent' | 'switchPane' | 'mark' | 'markAll' | 'invertMark'
   | 'view' | 'viewEbcdic' | 'edit' | 'copy' | 'copyNoDialog' | 'rename' | 'create'
   | 'delete' | 'submit' | 'compare' | 'refresh' | 'swapPanes' | 'focusCommandLine'
-  | 'quickFilter' | 'cancel' | 'nextView'
+  | 'quickFilter' | 'cancel' | 'nextView' | 'sortNext' | 'sortReverse'
   | 'kindLocal' | 'kindDs' | 'kindUss' | 'kindJes';
 
 const BINDINGS: Record<string, Action> = {
@@ -27,8 +27,13 @@ const BINDINGS: Record<string, Action> = {
   Tab: 'switchPane',
   Insert: 'mark',
   ' ': 'mark',
+  F2: 'refresh',
   F3: 'view',
   'Shift+F3': 'viewEbcdic',
+  // Total Commander sorts with Ctrl+F3..F6, one key per column. The columns
+  // here are the provider's, and differ per world, so one key walks them.
+  'Ctrl+F3': 'sortNext',
+  'Ctrl+Shift+F3': 'sortReverse',
   F4: 'edit',
   F5: 'copy',
   'Shift+F5': 'copyNoDialog',

@@ -25,12 +25,14 @@ export function activate(context: vscode.ExtensionContext): void {
   }));
   providers.register(new JesProvider(sessions, { defaultOwner: settings.jesOwner }));
 
-  EditorBridge.register(context, providers, settings.transferDefaults, {
+  const bridge = EditorBridge.register(context, providers, settings.transferDefaults, {
     codepage: settings.ebcdicCodepage,
     recordLength: settings.ebcdicRecordLength,
   });
 
   context.subscriptions.push(
+    // Saving a member from an editor changes what the pane behind it is showing.
+    bridge.onDidWrite((location) => CommanderPanel.locationChanged(location)),
     vscode.commands.registerCommand('mc.open', () => {
       CommanderPanel.show(context, providers, sessions);
     }),

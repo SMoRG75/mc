@@ -35,6 +35,17 @@ export class EditorBridge implements vscode.FileSystemProvider {
   private readonly emitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
   readonly onDidChangeFile = this.emitter.event;
 
+  /**
+   * Where a Ctrl+S just landed.
+   *
+   * The listing behind it is stale the moment the save returns — the size and
+   * the ISPF statistics are z/OS's answer, not ours, and a member saved from
+   * here may have no statistics at all. The pane showing that place refreshes
+   * itself rather than making the user think to press F2.
+   */
+  private readonly wrote = new vscode.EventEmitter<PaneLocation>();
+  readonly onDidWrite = this.wrote.event;
+
   constructor(
     private readonly providers: ProviderRegistry,
     private readonly transferDefaults: () => TransferOptions,
@@ -131,6 +142,7 @@ export class EditorBridge implements vscode.FileSystemProvider {
         this.transferDefaults(), new AbortController().signal,
       );
       this.emitter.fire([{ type: vscode.FileChangeType.Changed, uri }]);
+      this.wrote.fire(target.location);
     } catch (err) {
       throw toFileSystemError(err, uri);
     }

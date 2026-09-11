@@ -25,6 +25,14 @@ export class Pane {
   private filter = '';
   /** Filtered and sorted rows, recomputed only when the data or filter changes. */
   private view: EntryDto[] = [];
+  /**
+   * Which column the rows are ordered by. Every column a provider declares can
+   * be sorted on — VV.MM and Created on a source PDS, AMODE and RMODE on a load
+   * library — so this is a column id rather than a fixed list of sort orders.
+   */
+  private sort: { column: string; descending: boolean } = { column: 'name', descending: false };
+  /** Right-aligned columns hold counts, and 9 must not sort after 10. */
+  private numericColumns = new Set<string>();
 
   constructor(
     readonly id: PaneId,
@@ -162,13 +170,15 @@ export class Pane {
       this.pathBar.append(badge);
     }
 
-    this.columnsRow.replaceChildren(...listing.columns.map((column) => {
-      const cell = document.createElement('span');
-      cell.className = column.align === 'right' ? 'cell right' : 'cell';
-      cell.style.flexBasis = `${column.width}%`;
-      cell.textContent = column.title;
-      return cell;
-    }));
+    this.numericColumns = new Set(
+      listing.columns.filter((c) => c.align === 'right').map((c) => c.id),
+    );
+    // A DS filter and a load library do not share columns, so an order carried
+    // over from the last listing may name a column that is no longer there.
+    if (!listing.columns.some((c) => c.id === this.sort.column)) {
+      this.sort = { column: 'name', descending: false };
+    }
+    this.renderColumns();
 
     this.applyFilter();
     if (listing.cursor !== undefined) {
@@ -182,6 +192,59 @@ export class Pane {
       this.list.setCursor(0);
     }
     this.updateFooter();
+  }
+
+  private renderColumns(): void {
+    const columns = this.listing?.columns ?? [];
+    this.columnsRow.replaceChildren(...columns.map((column) => {
+      const cell = document.createElement('span');
+      cell.className = column.align === 'right' ? 'cell right sortable' : 'cell sortable';
+      cell.style.flexBasis = `${column.width}%`;
+      const sorted = this.sort.column === column.id;
+      cell.textContent = sorted
+        ? `${column.title} ${this.sort.descending ? '▼' : '▲'}`
+        : column.title;
+      if (sorted) cell.classList.add('sorted');
+      cell.title = `Sort by ${column.title}`;
+      cell.addEventListener('click', () => this.sortBy(column.id));
+      return cell;
+    }));
+  }
+
+  /** Clicking a header sorts by it, and clicking it again turns it around. */
+  private sortBy(column: string): void {
+    this.sort = this.sort.column === column
+      ? { column, descending: !this.sort.descending }
+      : { column, descending: false };
+    this.resort();
+  }
+
+  /** Ctrl+F3: the next column along, wrapping back to the first. */
+  sortByNextColumn(): void {
+    const columns = this.listing?.columns ?? [];
+    if (columns.length === 0) return;
+    const index = columns.findIndex((c) => c.id === this.sort.column);
+    this.sort = { column: columns[(index + 1) % columns.length]!.id, descending: false };
+    this.resort();
+  }
+
+  /** Ctrl+Shift+F3: same column, other end. */
+  reverseSort(): void {
+    this.sort = { ...this.sort, descending: !this.sort.descending };
+    this.resort();
+  }
+
+  /**
+   * Re-orders in place. The cursor follows the row it was on rather than the
+   * position: sorting is for finding something, and losing it in the act would
+   * defeat the point.
+   */
+  private resort(): void {
+    const entryId = this.cursorEntry?.id;
+    this.renderColumns();
+    this.applyFilter();
+    const index = entryId ? this.view.findIndex((entry) => entry.id === entryId) : -1;
+    this.list.setCursor(index < 0 ? 0 : index);
   }
 
   /** Ctrl+S in Total Commander: type to narrow the list without leaving it. */
@@ -212,11 +275,37 @@ export class Pane {
     };
     const rows = this.listing.entries
       .filter((entry) => !this.filter || entry.name.toLowerCase().includes(this.filter))
-      .sort((a, b) => (a.sortKey ?? a.name).localeCompare(b.sortKey ?? b.name, 'en'));
+      .sort((a, b) => this.compare(a, b));
 
     this.view = [up, ...rows];
     this.list.setData(this.listing.columns, this.view);
     this.list.setMarked(this.marked);
+  }
+
+  /**
+   * Orders two rows by the sorted column, falling back to the name so that
+   * equal values keep a fixed order instead of shuffling on every refresh.
+   *
+   * Blank cells always sink to the bottom: members written by anything but
+   * ISPF carry no statistics, and a screenful of empty rows is not a useful
+   * answer to "show me the biggest ones" in either direction.
+   */
+  private compare(a: EntryDto, b: EntryDto): number {
+    const byName = (a.sortKey ?? a.name).localeCompare(b.sortKey ?? b.name, 'en');
+    if (this.sort.column === 'name') return this.sort.descending ? -byName : byName;
+
+    const left = a.cells[this.sort.column] ?? '';
+    const right = b.cells[this.sort.column] ?? '';
+    if (left === right) return byName;
+    if (!left) return 1;
+    if (!right) return -1;
+
+    let order = left.localeCompare(right, 'en');
+    if (this.numericColumns.has(this.sort.column)) {
+      const [x, y] = [Number(left), Number(right)];
+      if (Number.isFinite(x) && Number.isFinite(y)) order = x - y;
+    }
+    return this.sort.descending ? -order : order;
   }
 
   visibleEntries(): readonly EntryDto[] {

@@ -125,6 +125,9 @@ option {
   text-overflow: ellipsis;
 }
 .cell.right { text-align: right; }
+.columns .cell.sortable { cursor: pointer; user-select: none; }
+.columns .cell.sortable:hover { color: var(--vscode-foreground); }
+.columns .cell.sorted { color: var(--vscode-foreground); }
 
 .rows-viewport { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
 /* The list holds focus so keys land; the cursor row is what shows it. */

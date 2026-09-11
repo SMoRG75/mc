@@ -105,6 +105,19 @@ export class CommanderPanel {
     CommanderPanel.current?.post({ type: 'key', key });
   }
 
+  /**
+   * Re-lists any pane standing where something was just written. Static for the
+   * same reason as `forwardKey`: the editor bridge outlives the panel, which is
+   * only created when the user opens it.
+   */
+  static locationChanged(location: PaneLocation): void {
+    const panel = CommanderPanel.current;
+    if (!panel) return;
+    for (const pane of ['left', 'right'] as PaneId[]) {
+      if (sameLocation(panel.panes[pane].location, location)) void panel.refresh(pane);
+    }
+  }
+
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     private readonly context: vscode.ExtensionContext,

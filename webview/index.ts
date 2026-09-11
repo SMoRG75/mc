@@ -8,6 +8,7 @@ import { setHostWorking, setTransfersRunning } from './progress';
 import { send } from './vscode';
 
 const FKEYS: [key: string, label: string, hint?: string][] = [
+  ['F2', 'Refresh', 'Saving a member in the editor refreshes the pane on its own'],
   ['F3', 'View', 'Shift+F3 shows the raw bytes decoded as EBCDIC'],
   ['F4', 'Edit'],
   ['F5', 'Copy', 'Shift+F5 copies without the dialog'],
@@ -234,6 +235,8 @@ class App {
         return;
       }
       case 'quickFilter': return this.enterFilter();
+      case 'sortNext': return pane.sortByNextColumn();
+      case 'sortReverse': return pane.reverseSort();
       case 'focusCommandLine': return this.commandInput.focus();
 
       // Alt+1..4, on the pane the cursor is in, and the same thing as clicking
