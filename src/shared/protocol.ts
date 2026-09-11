@@ -184,6 +184,15 @@ export type HostMessage =
 export type ClientMessage =
   | { type: 'ready' }
   | { type: 'navigate'; pane: PaneId; location: PaneLocation }
+  /**
+   * Alt+1..4 and the tabs in the pane header: show `kind`, resuming where the
+   * pane last was in that world.
+   *
+   * Not a `navigate`, because the webview cannot say where that is — the host
+   * is the side that remembers. And because pressing it for the world the pane
+   * is already showing means something else: go to the top of it.
+   */
+  | { type: 'switchKind'; pane: PaneId; kind: PaneKind }
   | { type: 'enter'; pane: PaneId; entryId: string }
   | { type: 'up'; pane: PaneId }
   | { type: 'refresh'; pane: PaneId }

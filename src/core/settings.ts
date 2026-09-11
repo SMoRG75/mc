@@ -14,6 +14,17 @@ export interface RememberedPane {
   location: PaneLocation;
   /** Entry id the cursor was on, when there was one worth coming back to. */
   cursor?: string;
+  /**
+   * Where the pane stood in each of the four worlds, so Alt+1..4 comes back to
+   * the PDS you were reading after a restart and not only within a session.
+   * Four entries at most, and the pane's own world is one of them.
+   */
+  worlds?: RememberedWorld[];
+}
+
+export interface RememberedWorld {
+  location: PaneLocation;
+  cursor?: string;
 }
 
 export interface RememberedPanes {
@@ -139,10 +150,27 @@ export function asRememberedPanes(value: unknown): RememberedPanes | undefined {
 }
 
 function asPane(value: unknown): RememberedPane | undefined {
-  const raw = value as { location?: unknown; cursor?: unknown } | undefined;
+  const raw = value as { location?: unknown; cursor?: unknown; worlds?: unknown } | undefined;
   const location = asLocation(raw?.location);
   if (!location) return undefined;
-  return { location, cursor: typeof raw?.cursor === 'string' ? raw.cursor : undefined };
+  return {
+    location,
+    cursor: typeof raw?.cursor === 'string' ? raw.cursor : undefined,
+    worlds: asWorlds(raw?.worlds),
+  };
+}
+
+/** One entry per world, and a single unreadable one is dropped rather than all. */
+function asWorlds(value: unknown): RememberedWorld[] {
+  if (!Array.isArray(value)) return [];
+  const worlds: RememberedWorld[] = [];
+  for (const raw of value as { location?: unknown; cursor?: unknown }[]) {
+    const location = asLocation(raw?.location);
+    if (location) {
+      worlds.push({ location, cursor: typeof raw?.cursor === 'string' ? raw.cursor : undefined });
+    }
+  }
+  return worlds;
 }
 
 /**

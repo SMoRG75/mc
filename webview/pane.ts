@@ -32,6 +32,7 @@ export class Pane {
       activate: (entry: EntryDto) => void;
       focus: (pane: PaneId) => void;
       navigate: (location: PaneLocation) => void;
+      switchKind: (kind: PaneKind) => void;
       cursorMoved: (pane: PaneId, entryId: string) => void;
     },
   ) {
@@ -122,10 +123,14 @@ export class Pane {
   /**
    * Points the pane at another world — what the header tabs do, and what
    * Alt+1..4 do. Both go through here so the keyboard cannot drift away from
-   * what the tabs mean: the top of that world, with the profile kept.
+   * what the tabs mean.
+   *
+   * Where in that world is the host's answer: it comes back to where the pane
+   * last stood there, and asking for the world it is already showing is the way
+   * back to the top of it.
    */
   showKind(kind: PaneKind): void {
-    this.navigate({ kind, path: '' });
+    this.callbacks.switchKind(kind);
   }
 
   setBusy(busy: boolean): void {

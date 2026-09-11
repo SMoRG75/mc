@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import {
   reportsProgress,
-  type ClientMessage, type HostMessage, type PaneId, type PaneLocation,
+  type ClientMessage, type HostMessage, type PaneId, type PaneKind, type PaneLocation,
   type TransferJobDto, type TransferOptions,
 } from './shared/protocol';
 import type { Entry, PaneProvider, ProviderRegistry } from './core/provider';
@@ -9,7 +9,10 @@ import { TransferQueue, type TransferRequest } from './core/transferQueue';
 import { EditorBridge, type OpenMode } from './core/editorBridge';
 import { CursorHistory } from './core/cursorHistory';
 import { describeError, UserFacingError } from './core/errors';
-import { asRememberedPanes, sameLocation, settings, type RememberedPanes } from './core/settings';
+import {
+  asRememberedPanes, sameLocation, settings,
+  type RememberedPane, type RememberedPanes,
+} from './core/settings';
 import type { SessionManager } from './zowe/sessions';
 
 const VIEW_TYPE = 'mainframeCommander';
@@ -33,6 +36,12 @@ interface PaneState {
    * into a PDS and back out lands on the member you came from, not at the top.
    */
   history: CursorHistory;
+  /**
+   * The last place the pane stood in each world, so Alt+2 comes back to the PDS
+   * you were reading rather than to the dataset filter. Four entries at most,
+   * and only for the session — the same reasoning as the cursor history.
+   */
+  lastByKind: Partial<Record<PaneKind, PaneLocation>>;
   /**
    * A remembered cursor waiting to be handed back, cleared once it has been.
    * Set only when the pane moves: a plain refresh must not carry one, or
@@ -114,7 +123,20 @@ export class CommanderPanel {
       // Seeded, so navigating away from the restored location and back returns
       // to the same row rather than only working from the second visit on.
       if (cursor) history.remember(location, cursor);
-      return { location, entries: [], cursor, restore: cursor, history };
+
+      // The other three worlds, with their rows. Kept whatever `mc.panes.*`
+      // says: the setting decides where the pane starts, not where it stood in
+      // a world it is not starting in.
+      const lastByKind: Partial<Record<PaneKind, PaneLocation>> = {};
+      for (const world of saved?.worlds ?? []) {
+        lastByKind[world.location.kind] = world.location;
+        if (world.cursor) history.remember(world.location, world.cursor);
+      }
+      // Last, so the world the pane is actually opening in is the one it starts
+      // in — the setting may have moved it since.
+      lastByKind[location.kind] = location;
+
+      return { location, entries: [], cursor, restore: cursor, history, lastByKind };
     };
     this.panes = { left: restore('left'), right: restore('right') };
 
@@ -171,6 +193,20 @@ export class CommanderPanel {
           this.goTo(msg.pane, msg.location);
           await this.refresh(msg.pane);
           break;
+
+        case 'switchKind': {
+          const state = this.panes[msg.pane];
+          const here = state.location;
+          // The root of a world, on the profile the pane is already using: what
+          // a world it has never been to opens on, and what a second press
+          // means once it is there.
+          const root: PaneLocation = { kind: msg.kind, profile: here.profile, path: '' };
+          this.goTo(msg.pane, here.kind === msg.kind
+            ? root
+            : state.lastByKind[msg.kind] ?? root);
+          await this.refresh(msg.pane);
+          break;
+        }
 
         case 'up': {
           const state = this.panes[msg.pane];
@@ -327,6 +363,7 @@ export class CommanderPanel {
   private goTo(pane: PaneId, location: PaneLocation): void {
     const state = this.panes[pane];
     state.location = location;
+    state.lastByKind[location.kind] = location;
     state.restore = state.history.recall(location);
     state.cursor = state.restore;
   }
@@ -349,8 +386,8 @@ export class CommanderPanel {
 
   private rememberPanes(): void {
     const state: RememberedPanes = {
-      left: { location: this.panes.left.location, cursor: this.panes.left.cursor },
-      right: { location: this.panes.right.location, cursor: this.panes.right.cursor },
+      left: this.rememberedPane('left'),
+      right: this.rememberedPane('right'),
       from: {
         left: settings.configuredStartLocation('left'),
         right: settings.configuredStartLocation('right'),
@@ -360,6 +397,23 @@ export class CommanderPanel {
     if (json === this.remembered) return;
     this.remembered = json;
     void this.context.globalState.update(REMEMBERED_PANES, state);
+  }
+
+  /**
+   * One pane's position: where it is, and where it stood in every world it has
+   * been to, each with the row it was on. The rows come out of the cursor
+   * history rather than being tracked a second time — it is already the thing
+   * that knows them.
+   */
+  private rememberedPane(pane: PaneId): RememberedPane {
+    const state = this.panes[pane];
+    return {
+      location: state.location,
+      cursor: state.cursor,
+      worlds: Object.values(state.lastByKind)
+        .filter((location): location is PaneLocation => location !== undefined)
+        .map((location) => ({ location, cursor: state.history.recall(location) })),
+    };
   }
 
   private async openInEditor(pane: PaneId, entryId: string, mode: OpenMode): Promise<void> {

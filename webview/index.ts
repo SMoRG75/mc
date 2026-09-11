@@ -73,6 +73,7 @@ class App {
       },
       focus: (pane) => this.setActive(pane),
       navigate: (location: PaneLocation) => send({ type: 'navigate', pane: id, location }),
+      switchKind: (kind) => send({ type: 'switchKind', pane: id, kind }),
       cursorMoved: (pane, entryId) => this.rememberCursor(pane, entryId),
     });
   }
@@ -235,10 +236,9 @@ class App {
       case 'quickFilter': return this.enterFilter();
       case 'focusCommandLine': return this.commandInput.focus();
 
-      // Alt+1..4, on the pane the cursor is in. Same thing as clicking the tab,
-      // so pressing the one the pane is already on goes back to the top of it —
-      // and the cursor history brings the old row back when you switch away and
-      // return.
+      // Alt+1..4, on the pane the cursor is in, and the same thing as clicking
+      // the tab: back to where the pane last was in that world, or to the top
+      // of it when it is already there.
       case 'kindLocal': return pane.showKind('local');
       case 'kindDs': return pane.showKind('ds');
       case 'kindUss': return pane.showKind('uss');
