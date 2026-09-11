@@ -1,5 +1,6 @@
 import type {
-  Capabilities, EntryDto, ListingDto, PaneId, PaneKind, PaneLocation, ProfileDto, ViewDto,
+  Capabilities, EntryDto, FavouriteDto, FilterDto, ListingDto, PaneId, PaneKind, PaneLocation,
+  ProfileDto, ViewDto,
 } from '../src/shared/protocol';
 import { VirtualList } from './virtualList';
 
@@ -21,6 +22,8 @@ export class Pane {
 
   private listing?: ListingDto;
   private profiles: ProfileDto[] = [];
+  /** The saved views, all of them — which ones belong here is decided per listing. */
+  private favourites: FavouriteDto[] = [];
   private readonly marked = new Set<string>();
   private filter = '';
   /** Filtered and sorted rows, recomputed only when the data or filter changes. */
@@ -42,6 +45,7 @@ export class Pane {
       navigate: (location: PaneLocation) => void;
       switchKind: (kind: PaneKind) => void;
       cursorMoved: (pane: PaneId, entryId: string) => void;
+      editFilter: (pane: PaneId) => void;
     },
   ) {
     this.element.className = 'pane';
@@ -64,6 +68,11 @@ export class Pane {
     this.header.append(this.profileSelect, this.kindTabs, this.viewTabs);
 
     this.pathBar.className = 'pathbar';
+    // The path bar of a world that is a filter says what the filter is, so it is
+    // also the obvious place to click to change it.
+    this.pathBar.addEventListener('click', () => {
+      if (this.filterSpec) this.callbacks.editFilter(this.id);
+    });
     this.footer.className = 'pane-foot';
 
     const columns = document.createElement('div');
@@ -81,6 +90,19 @@ export class Pane {
   /** What the provider behind this listing allows — undefined until it arrives. */
   get capabilities(): Capabilities | undefined {
     return this.listing?.capabilities;
+  }
+
+  /**
+   * What Ctrl+F can change here, or undefined in a world that is a path.
+   * Nothing to do with `filter` above, which is the Ctrl+S row filter.
+   */
+  get filterSpec(): FilterDto | undefined {
+    return this.listing?.filter;
+  }
+
+  /** The path bar's text — what a saved view of this place would be called. */
+  get title(): string {
+    return this.listing?.title ?? '';
   }
 
   setActive(active: boolean): void {
@@ -163,6 +185,8 @@ export class Pane {
     this.renderViewTabs(listing.views ?? []);
 
     this.pathBar.textContent = listing.title;
+    this.pathBar.classList.toggle('editable', listing.filter !== undefined);
+    this.pathBar.title = listing.filter ? 'Ctrl+F — change the filter' : '';
     if (listing.truncated) {
       const badge = document.createElement('span');
       badge.className = 'badge warn';
@@ -389,15 +413,46 @@ export class Pane {
     return views[(index + 1) % views.length]?.location;
   }
 
+  /** The saved views changed; the ones belonging to this pane are tabs. */
+  setFavourites(favourites: FavouriteDto[]): void {
+    this.favourites = favourites;
+    this.renderViewTabs(this.listing?.views ?? []);
+  }
+
+  /**
+   * The provider's own views, and then the ones the user saved in this world.
+   *
+   * Both are the same thing — a name and a place to stand — so they share the
+   * strip. A saved view belongs to the profile it was saved on: a JES filter
+   * from one LPAR says nothing about the queue on another.
+   */
   private renderViewTabs(views: ViewDto[]): void {
-    this.viewTabs.classList.toggle('hidden', views.length === 0);
-    this.viewTabs.replaceChildren(...views.map((view) => {
-      const tab = document.createElement('span');
-      tab.textContent = view.label;
-      if (view.active) tab.className = 'on';
-      tab.addEventListener('click', () => this.callbacks.navigate(view.location));
-      return tab;
-    }));
+    const here = this.listing?.location;
+    const saved = here
+      ? this.favourites.filter(
+        (f) => f.location.kind === here.kind && f.location.profile === here.profile,
+      )
+      : [];
+    this.viewTabs.classList.toggle('hidden', views.length + saved.length === 0);
+
+    const tab = (label: string, active: boolean, location: PaneLocation, className = '') => {
+      const element = document.createElement('span');
+      element.textContent = label;
+      element.className = [className, active ? 'on' : ''].filter(Boolean).join(' ');
+      element.addEventListener('click', () => this.callbacks.navigate(location));
+      return element;
+    };
+
+    this.viewTabs.replaceChildren(
+      ...views.map((view) => tab(view.label, view.active, view.location)),
+      ...saved.map((favourite) => {
+        const element = tab(
+          favourite.name, here?.path === favourite.location.path, favourite.location, 'saved',
+        );
+        element.title = `${favourite.location.path || '(top)'} — Ctrl+D manages saved views`;
+        return element;
+      }),
+    );
   }
 
   private renderKindTabs(current: PaneKind): void {

@@ -1,9 +1,12 @@
 import type {
-  EntryDto, HostMessage, PaneId, PaneLocation, ProfileDto, TransferJobDto, TransferOptions,
+  EntryDto, FavouriteDto, HostMessage, PaneId, PaneLocation, ProfileDto,
+  TransferJobDto, TransferOptions,
 } from '../src/shared/protocol';
 import { Pane } from './pane';
 import { Dispatcher, type Action } from './keymap';
-import { datasetDialog, modalOpen, prompt, transferDialog } from './dialogs';
+import {
+  datasetDialog, favouritesDialog, filterDialog, modalOpen, prompt, transferDialog,
+} from './dialogs';
 import { setHostWorking, setTransfersRunning } from './progress';
 import { send } from './vscode';
 
@@ -24,6 +27,7 @@ class App {
   };
   private codepages: string[] = [];
   private profiles: ProfileDto[] = [];
+  private favourites: FavouriteDto[] = [];
   private filterMode = false;
   private filterText = '';
   private pendingCursor: Partial<Record<PaneId, { location: PaneLocation; entryId: string }>> = {};
@@ -76,6 +80,10 @@ class App {
       navigate: (location: PaneLocation) => send({ type: 'navigate', pane: id, location }),
       switchKind: (kind) => send({ type: 'switchKind', pane: id, kind }),
       cursorMoved: (pane, entryId) => this.rememberCursor(pane, entryId),
+      editFilter: (pane) => {
+        this.setActive(pane);
+        void this.editFilter();
+      },
     });
   }
 
@@ -144,6 +152,10 @@ class App {
         this.codepages = message.codepages;
         this.profiles = message.profiles;
         for (const pane of ['left', 'right'] as PaneId[]) this.panes[pane].setProfiles(this.profiles);
+        this.setFavourites(message.favourites);
+        break;
+      case 'favourites':
+        this.setFavourites(message.favourites);
         break;
       case 'profiles':
         this.profiles = message.profiles;
@@ -238,6 +250,8 @@ class App {
       case 'sortNext': return pane.sortByNextColumn();
       case 'sortReverse': return pane.reverseSort();
       case 'focusCommandLine': return this.commandInput.focus();
+      case 'editFilter': return this.editFilter();
+      case 'favourites': return this.showFavourites();
 
       // Alt+1..4, on the pane the cursor is in, and the same thing as clicking
       // the tab: back to where the pane last was in that world, or to the top
@@ -354,6 +368,51 @@ class App {
         return;
       }
     }
+  }
+
+  /* ---- filter and saved views -------------------------------------- */
+
+  /**
+   * Ctrl+F, and a click on the path bar: the pane's filter as fields.
+   *
+   * Only the worlds that are a filter rather than a path declare one — on JES
+   * that is owner, job name and queue, which is otherwise a `owner=…;prefix=…`
+   * path to be typed out on the command line.
+   */
+  private async editFilter(): Promise<void> {
+    const pane = this.panes[this.active];
+    const spec = pane.filterSpec;
+    if (!spec) {
+      return pane.setError('There is nothing to filter here — Ctrl+F works on a JES pane.');
+    }
+    const values = await filterDialog(spec);
+    if (values) send({ type: 'setFilter', pane: this.active, values });
+  }
+
+  /**
+   * Ctrl+D: the saved views, and the offer to add the one on screen.
+   *
+   * The pane's own title is the suggested name — `JES2 · owner=SANJ · prefix=BK*`
+   * says exactly what is being saved, and is worth editing down to 'My backups'.
+   */
+  private async showFavourites(): Promise<void> {
+    const pane = this.panes[this.active];
+    const location = pane.location;
+    if (!location) return;
+    const choice = await favouritesDialog(this.favourites, pane.title);
+    if (!choice) return;
+    if (choice.type === 'go') {
+      send({ type: 'navigate', pane: this.active, location: choice.location });
+    } else if (choice.type === 'save') {
+      send({ type: 'saveFavourite', name: choice.name, location });
+    } else {
+      send({ type: 'removeFavourite', name: choice.name });
+    }
+  }
+
+  private setFavourites(favourites: FavouriteDto[]): void {
+    this.favourites = favourites;
+    for (const pane of ['left', 'right'] as PaneId[]) this.panes[pane].setFavourites(favourites);
   }
 
   /* ---- quick filter ------------------------------------------------ */

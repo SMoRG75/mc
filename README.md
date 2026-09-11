@@ -62,7 +62,7 @@ webview/
 ├─ pane.ts                 One pane: header, path, rows, footer, selection
 ├─ virtualList.ts          Windowed rendering — only visible rows are built
 ├─ keymap.ts               Key → action, with dedup of forwarded keys
-├─ dialogs.ts              The F5 transfer dialog, prompt, confirm
+├─ dialogs.ts              F5 transfer, F7 allocation, Ctrl+F filter, Ctrl+D saved views
 └─ style.css               Total Commander layout in the user's VS Code theme
 ```
 
@@ -78,6 +78,32 @@ special case, just `source.read()` followed by `target.write()`.
 - **JES is a file system.** Jobs are folders, spool DDs are files. That is why
   F3/F5/F8 mean the same thing there as everywhere else, without a separate
   command palette just for jobs.
+- **The JES filter is a dialog, not a path.** Which jobs a JES pane shows comes
+  down to owner, job name and queue, and writing that as
+  `owner=IBMUSER;prefix=BK*;status=output` is a syntax to remember rather than a
+  question to answer. `Ctrl+F` — or a click on the path bar, which is showing
+  exactly those three things — asks for them as fields and hands the answer back
+  to the provider, which is still the only side that knows how a JES path is
+  spelled. The dialog opens on the *resolved* values, so the owner it shows is
+  the one being listed even when the path never said one. The fields themselves
+  are the provider's (`Listing.filter`), so the mechanism is not JES-specific:
+  any world that is a filter rather than a path can declare one and get the same
+  dialog. The four view tabs stay honest about the filter rather than beside it:
+  `Mine` and `All` claim to be every job of an owner, so they clear the job name
+  as well — a `Mine` that still hides everything but `RACF*` is not mine —
+  while `Active` and `Output` only claim a queue and keep what is in force. And
+  a tab is lit only when the pane is showing exactly what that tab points at, so
+  a filter typed into Ctrl+F that none of the four describes lights up none of
+  them instead of one that is not true.
+- **Saved views are favourites with a name.** `Ctrl+D` saves where a pane is
+  standing — LPAR, world and filter — under a name, and every saved view for the
+  world and profile a pane is in turns up as a ★ tab beside the provider's own
+  views, because they are the same kind of thing: a name and a place to stand.
+  They live in `mc.favourites` rather than in the extension's own storage: this
+  is the user saying "this is a view I want back", which belongs somewhere they
+  can read, edit and share, next to `mc.panes.*`. The name is the identity, so
+  saving over one replaces it, and the list is validated on the way in — it is
+  an array people will edit by hand.
 - **F7 asks for more than a name on MVS.** RECFM, LRECL and the space cannot be
   changed afterwards, so allocation has a real dialog with the four shapes it
   actually comes down to (FB 80, FBA 133, VB 255, load module) — and a LIKE
@@ -144,7 +170,7 @@ Zowe v8 API. The following is missing before it is usable in practice:
 - [x] Run against a real LPAR — nothing here has seen z/OSMF yet
 - [ ] Streaming for large transfers (reads and writes the whole buffer today)
 - [ ] Recursive copying of directories and PDSes
-- [ ] `Alt+F7` search, favourites (`Ctrl+D`), per-column sort options
+- [ ] `Alt+F7` search
 - [ ] TSO and console commands on the command line
 - [ ] Recall of migrated data sets (shown, but refused for now)
 - [ ] Tests

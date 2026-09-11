@@ -167,6 +167,15 @@ export class CommanderPanel {
       panel.onDidChangeViewState(() => {
         if (panel.active) this.post({ type: 'focus' });
       }),
+      // The saved views are a setting, so they also change when the user edits
+      // settings.json by hand — and the pane header has to follow either way.
+      // Our own writes come back through here too, which is why saving one does
+      // not post anything itself.
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('mc.favourites')) {
+          this.post({ type: 'favourites', favourites: settings.favourites() });
+        }
+      }),
       panel.onDidDispose(() => this.dispose()),
     );
     this.scheduleJesRefresh();
@@ -197,6 +206,7 @@ export class CommanderPanel {
             profiles: await this.sessions.profiles().catch(() => []),
             defaults: settings.transferDefaults(),
             codepages: settings.codepages(),
+            favourites: settings.favourites(),
           });
           this.post({ type: 'focus' });
           await Promise.all([this.refresh('left'), this.refresh('right')]);
@@ -308,6 +318,30 @@ export class CommanderPanel {
         case 'commandLine':
           await this.runCommandLine(msg.pane, msg.line);
           break;
+
+        case 'setFilter': {
+          const provider = this.provider(msg.pane);
+          if (!provider.applyFilter) break;
+          this.goTo(msg.pane, provider.applyFilter(this.panes[msg.pane].location, msg.values));
+          await this.refresh(msg.pane);
+          break;
+        }
+
+        case 'saveFavourite':
+          // The name is the identity, so saving over one replaces it — that is
+          // how a saved filter gets adjusted without leaving two tabs that
+          // claim to be the same view.
+          await settings.saveFavourites([
+            ...settings.favourites().filter((f) => f.name !== msg.name),
+            { name: msg.name, location: msg.location },
+          ]);
+          break;
+
+        case 'removeFavourite':
+          await settings.saveFavourites(
+            settings.favourites().filter((f) => f.name !== msg.name),
+          );
+          break;
       }
     } catch (err) {
       const { message, detail } = describeError(err);
@@ -345,6 +379,7 @@ export class CommanderPanel {
           truncated: listing.truncated,
           capabilities: provider.capabilities(state.location),
           views: listing.views,
+          filter: listing.filter,
           cursor: state.restore,
         },
       });

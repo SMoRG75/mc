@@ -13,6 +13,7 @@ export type Action =
   | 'view' | 'viewEbcdic' | 'edit' | 'copy' | 'copyNoDialog' | 'rename' | 'create'
   | 'delete' | 'submit' | 'compare' | 'refresh' | 'swapPanes' | 'focusCommandLine'
   | 'quickFilter' | 'cancel' | 'nextView' | 'sortNext' | 'sortReverse'
+  | 'editFilter' | 'favourites'
   | 'kindLocal' | 'kindDs' | 'kindUss' | 'kindJes';
 
 const BINDINGS: Record<string, Action> = {
@@ -49,6 +50,11 @@ const BINDINGS: Record<string, Action> = {
   'Ctrl+i': 'invertMark',
   'Ctrl+s': 'quickFilter',
   'Ctrl+j': 'nextView',
+  // Ctrl+F edits what the pane is a filter of — owner and job name on JES —
+  // where Ctrl+S only narrows the rows that came back.
+  'Ctrl+f': 'editFilter',
+  // Total Commander's directory hotlist, on the same key.
+  'Ctrl+d': 'favourites',
   Escape: 'cancel',
   // The four tabs in the pane header, in the order they are drawn.
   'Alt+1': 'kindLocal',

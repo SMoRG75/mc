@@ -1,6 +1,8 @@
 import * as os from 'node:os';
 import * as vscode from 'vscode';
-import type { PaneId, PaneKind, PaneLocation, TransferOptions } from '../shared/protocol';
+import type {
+  FavouriteDto, PaneId, PaneKind, PaneLocation, TransferOptions,
+} from '../shared/protocol';
 
 /**
  * Where the panes were pointing when they were last listed, and the `mc.panes.*`
@@ -72,21 +74,19 @@ export const settings = {
   /**
    * Writes the codepage the user picked back into the settings, so the choice
    * survives the session.
-   *
-   * Written to whichever scope already defines the key: updating the global
-   * value while a workspace value shadows it would look like the pick was
-   * silently ignored.
    */
   rememberCodepage: async (codepage: string): Promise<void> => {
     const config = vscode.workspace.getConfiguration('mc');
-    const inspected = config.inspect<string>('transfer.codepage');
     if (!codepage || codepage === (config.get<string>('transfer.codepage') ?? '')) return;
-    const target = inspected?.workspaceFolderValue !== undefined
-      ? vscode.ConfigurationTarget.WorkspaceFolder
-      : inspected?.workspaceValue !== undefined
-        ? vscode.ConfigurationTarget.Workspace
-        : vscode.ConfigurationTarget.Global;
-    await config.update('transfer.codepage', codepage, target);
+    await config.update('transfer.codepage', codepage, scopeOf(config, 'transfer.codepage'));
+  },
+
+  /** The saved views, checked rather than cast — this one gets hand-edited. */
+  favourites: (): FavouriteDto[] => asFavourites(settings.get<unknown>('favourites', [])),
+
+  saveFavourites: async (favourites: FavouriteDto[]): Promise<void> => {
+    const config = vscode.workspace.getConfiguration('mc');
+    await config.update('favourites', favourites, scopeOf(config, 'favourites'));
   },
 
   /** Where the pane opens when nothing has been remembered: the user's own setting. */
@@ -120,6 +120,40 @@ export const settings = {
 
 export function sameLocation(a: PaneLocation, b: PaneLocation): boolean {
   return a.kind === b.kind && a.profile === b.profile && a.path === b.path;
+}
+
+/**
+ * Which settings scope a value written from the UI belongs in: whichever one
+ * already defines it. Updating the global value while a workspace value shadows
+ * it would look like the save was silently ignored.
+ */
+function scopeOf(
+  config: vscode.WorkspaceConfiguration, key: string,
+): vscode.ConfigurationTarget {
+  const inspected = config.inspect(key);
+  if (inspected?.workspaceFolderValue !== undefined) return vscode.ConfigurationTarget.WorkspaceFolder;
+  if (inspected?.workspaceValue !== undefined) return vscode.ConfigurationTarget.Workspace;
+  return vscode.ConfigurationTarget.Global;
+}
+
+/**
+ * The saved views as the settings hold them.
+ *
+ * `mc.favourites` is an array a user may well write by hand, so an entry
+ * missing its location — or a second one under a name already taken — is
+ * dropped rather than allowed to reach the pane header.
+ */
+export function asFavourites(value: unknown): FavouriteDto[] {
+  if (!Array.isArray(value)) return [];
+  const favourites: FavouriteDto[] = [];
+  for (const raw of value as { name?: unknown; location?: unknown }[]) {
+    const location = asLocation(raw?.location);
+    const name = typeof raw?.name === 'string' ? raw.name.trim() : '';
+    if (location && name && !favourites.some((f) => f.name === name)) {
+      favourites.push({ name, location });
+    }
+  }
+  return favourites;
 }
 
 const KINDS: PaneKind[] = ['local', 'ds', 'uss', 'jes'];

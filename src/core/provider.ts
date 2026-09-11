@@ -1,5 +1,6 @@
 import type {
-  Capabilities, ColumnDef, DatasetSpec, EntryDto, PaneKind, PaneLocation, TransferOptions, ViewDto,
+  Capabilities, ColumnDef, DatasetSpec, EntryDto, FilterDto, PaneKind, PaneLocation,
+  TransferOptions, ViewDto,
 } from '../shared/protocol';
 
 /**
@@ -22,6 +23,14 @@ export interface Listing {
    * than one — JES and its status queues — fill this in.
    */
   views?: ViewDto[];
+  /**
+   * What Ctrl+F offers to change here.
+   *
+   * Built during the listing rather than asked for separately, because only the
+   * listing knows the resolved values: the owner a JES pane fell back to is the
+   * session user, which the path says nothing about.
+   */
+  filter?: FilterDto;
 }
 
 /** Everything a transfer needs to know about one item without re-listing it. */
@@ -62,6 +71,13 @@ export interface PaneProvider {
    * job filter is always absolute. Left out, `cd` replaces the path verbatim.
    */
   resolve?(loc: PaneLocation, argument: string): PaneLocation;
+
+  /**
+   * Where the filter dialog's answers point. `values` is keyed by the field ids
+   * from the `filter` this provider put on its last listing, so the mapping from
+   * "owner and job name" to a pane path stays in the one place that owns it.
+   */
+  applyFilter?(loc: PaneLocation, values: Record<string, string>): PaneLocation;
 
   /**
    * Where Enter on this entry leads. `undefined` means the entry is a leaf and

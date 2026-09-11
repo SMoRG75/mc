@@ -2,7 +2,7 @@ import { DeleteJobs, GetJobs, SubmitJobs } from '@zowe/zos-jobs-for-zowe-sdk';
 import type { IJob } from '@zowe/zos-jobs-for-zowe-sdk';
 import type { AbstractSession } from '@zowe/imperative';
 import type {
-  Capabilities, ColumnDef, PaneLocation, TransferOptions, ViewDto,
+  Capabilities, ColumnDef, FilterDto, PaneLocation, TransferOptions, ViewDto,
 } from '../shared/protocol';
 import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
 import type { SessionManager } from '../zowe/sessions';
@@ -61,8 +61,10 @@ export class JesProvider implements PaneProvider {
 
     if (!parsed.job) {
       const user = sessionUser(session);
-      const owner = parsed.owner || this.settings.defaultOwner().trim().toUpperCase() || user || '*';
-      const prefix = parsed.prefix || '*';
+      // Uppercased here rather than only where the dialog writes it, so a filter
+      // typed by hand into `mc.panes.*` or on the command line works too.
+      const owner = (parsed.owner || this.settings.defaultOwner()).trim().toUpperCase() || user || '*';
+      const prefix = parsed.prefix.trim().toUpperCase() || '*';
       const jobs = await GetJobs.getJobsCommon(session, {
         owner,
         prefix,
@@ -94,6 +96,7 @@ export class JesProvider implements PaneProvider {
         status: `${jobs.length} job${jobs.length === 1 ? '' : 's'}`,
         truncated: false,
         views: this.views(loc, { ...parsed, owner, prefix }, user),
+        filter: filterDto({ ...parsed, owner, prefix }),
       };
     }
 
@@ -129,33 +132,71 @@ export class JesProvider implements PaneProvider {
       truncated: false,
       // Picking a view from inside a job steps back out into that view.
       views: this.views(loc, parsed, sessionUser(session)),
+      filter: filterDto({ ...parsed, owner: parsed.owner || sessionUser(session) }),
     };
   }
 
   /**
    * The four ways of looking at the queue.
    *
-   * `Mine` and `All` set the owner; `Active` and `Output` narrow to a queue and
-   * keep whatever owner is already in force, so drilling into someone else's
-   * jobs and then asking for their output does what it says.
+   * `Mine` and `All` are whole views: they say "every job of this owner", so
+   * they clear the job name filter as well — a `Mine` that still hides
+   * everything but RACF* is not mine. `Active` and `Output` only claim to be a
+   * queue, so they keep the owner and the job name already in force: drilling
+   * into someone else's jobs and then asking for their output does what it says.
+   *
+   * Which one is current is not guessed from the owner and the queue: a view is
+   * where the pane is standing when the pane is showing exactly what the view
+   * points at, prefix included. So a filter typed into Ctrl+F that none of the
+   * four describes lights up none of them, rather than claiming to be `Mine`.
    */
   private views(loc: PaneLocation, filter: JesFilter, user: string): ViewDto[] {
-    const owner = filter.owner || user || '*';
-    const at = (patch: Partial<JesFilter>): PaneLocation => ({
-      ...loc,
-      // A view is a place to stand, never a job — selecting one leaves the spool.
-      path: toPath({ ...filter, job: undefined, ...patch }),
+    const here: JesFilter = {
+      owner: filter.owner || user || '*',
+      prefix: filter.prefix || '*',
+      status: filter.status,
+    };
+    // A view is a place to stand, never a job — selecting one leaves the spool.
+    const at = (patch: Partial<JesFilter>): JesFilter => ({ ...here, ...patch, job: undefined });
+    const view = (id: string, label: string, target: JesFilter): ViewDto => ({
+      id,
+      label,
+      location: { ...loc, path: toPath(target) },
+      active: target.owner === here.owner
+        && target.prefix === here.prefix
+        && target.status === here.status,
     });
-    const current = filter.status !== 'all'
-      ? filter.status
-      : (owner === '*' ? 'all' : 'mine');
 
     return [
-      { id: 'mine', label: 'Mine', location: at({ owner: user || owner, status: 'all' }), active: current === 'mine' },
-      { id: 'active', label: 'Active', location: at({ status: 'active' }), active: current === 'active' },
-      { id: 'output', label: 'Output', location: at({ status: 'output' }), active: current === 'output' },
-      { id: 'all', label: 'All', location: at({ owner: '*', status: 'all' }), active: current === 'all' },
+      view('mine', 'Mine', at({ owner: user || here.owner, prefix: '*', status: 'all' })),
+      view('active', 'Active', at({ status: 'active' })),
+      view('output', 'Output', at({ status: 'output' })),
+      view('all', 'All', at({ owner: '*', prefix: '*', status: 'all' })),
     ];
+  }
+
+  /**
+   * Ctrl+F. Owner and job name are what a JES pane is really about, and this is
+   * where they get answered — the alternative is typing `owner=…;prefix=…` into
+   * the command line and remembering the syntax.
+   *
+   * An empty owner is "not stated" rather than "nobody": the pane falls back to
+   * `mc.jes.owner` and then to the session user, which is what clearing the
+   * field should mean.
+   */
+  applyFilter(loc: PaneLocation, values: Record<string, string>): PaneLocation {
+    const current = parseLocation(loc);
+    return {
+      ...loc,
+      // Answering the filter is about which jobs to list, and a spool listing
+      // shows none — so the pane steps back out of the job it was in.
+      path: toPath({
+        owner: (values.owner ?? current.owner).trim().toUpperCase(),
+        prefix: (values.prefix ?? current.prefix).trim().toUpperCase(),
+        status: asStatus(values.status ?? current.status),
+        job: undefined,
+      }),
+    };
   }
 
   parent(loc: PaneLocation): PaneLocation | undefined {
@@ -280,6 +321,47 @@ function parseLocation(loc: PaneLocation): JesFilter {
     job: slash > 0
       ? { jobname: job.slice(0, slash), jobid: job.slice(slash + 1) }
       : undefined,
+  };
+}
+
+/**
+ * The Ctrl+F dialog for a JES pane.
+ *
+ * The values are the resolved ones, not what the path happens to say: the
+ * dialog has to open on what is actually being listed, or clearing a field the
+ * user never filled in would change the listing.
+ */
+function filterDto(filter: JesFilter): FilterDto {
+  return {
+    title: 'Job filter',
+    fields: [
+      {
+        id: 'owner',
+        label: 'Owner',
+        value: filter.owner,
+        hint: 'Whose jobs to list. * is everyone; empty falls back to mc.jes.owner and then to your own user.',
+      },
+      {
+        id: 'prefix',
+        label: 'Job name',
+        value: filter.prefix || '*',
+        // The wildcard is the whole trap: JES matches the name as it is given,
+        // so a name typed without one finds the single job called exactly that
+        // — which looks like a filter that is simply broken.
+        hint: "Matched as typed: 'RACF' finds only a job called RACF, 'RACF*' finds all of them. * is every job.",
+      },
+      {
+        id: 'status',
+        label: 'Queue',
+        value: filter.status,
+        choices: [
+          { value: 'all', label: 'All queues' },
+          { value: 'input', label: 'Input — waiting to run' },
+          { value: 'active', label: 'Active — running now' },
+          { value: 'output', label: 'Output — finished' },
+        ],
+      },
+    ],
   };
 }
 

@@ -151,6 +151,22 @@
       {
         "command": "mc.key",
         "args": {
+          "key": "Ctrl+f"
+        },
+        "key": "ctrl+f",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
+          "key": "Ctrl+d"
+        },
+        "key": "ctrl+d",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
           "key": "F12"
         },
         "key": "f12",
@@ -355,7 +371,46 @@
         "mc.jes.owner": {
           "type": "string",
           "default": "",
-          "description": "Default owner filter for JES panes. Empty means the session user."
+          "markdownDescription": "Owner a JES pane filters on when its path does not say. Empty means the session user. This is only the starting point — `Ctrl+F` changes owner and job name for the pane you are in, and `Ctrl+D` saves the result as a named view."
+        },
+        "mc.favourites": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "Saved views: places a pane can jump back to, added with `Ctrl+D`. Each one also appears as a ★ tab in the pane header when a pane is in the same world and on the same profile.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "location"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "What the tab says. Saving over a name replaces it."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "local",
+                      "ds",
+                      "uss",
+                      "jes"
+                    ]
+                  },
+                  "profile": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string",
+                    "markdownDescription": "As in `mc.panes.*`: a directory, a dataset filter, or a JES filter such as `owner=IBMUSER;prefix=BK*;status=output`."
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

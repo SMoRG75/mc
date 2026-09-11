@@ -64,6 +64,40 @@ export interface ViewDto {
   active: boolean;
 }
 
+/**
+ * One field in a pane's filter dialog.
+ *
+ * The provider decides what its filter is made of — owner, job name and queue on
+ * JES — so Ctrl+F can edit it without the webview knowing what a JES status
+ * queue is. `id` comes back untouched in `setFilter`.
+ */
+export interface FilterFieldDto {
+  id: string;
+  label: string;
+  value: string;
+  hint?: string;
+  /** A fixed set of answers makes the field a picker; anything else is a text box. */
+  choices?: { value: string; label: string }[];
+}
+
+export interface FilterDto {
+  /** Dialog heading, e.g. `Job filter`. */
+  title: string;
+  fields: FilterFieldDto[];
+}
+
+/**
+ * A place the user saved under a name.
+ *
+ * Kept in `mc.favourites` rather than in the extension's own storage: it is the
+ * user saying "this is a view I want back", which is the same kind of thing as
+ * `mc.panes.*` and belongs somewhere they can edit and share it.
+ */
+export interface FavouriteDto {
+  name: string;
+  location: PaneLocation;
+}
+
 export interface ListingDto {
   location: PaneLocation;
   /** What the path bar shows, e.g. `IBMUSER.PROD.JCL (PO-E · FB 80)`. */
@@ -77,6 +111,11 @@ export interface ListingDto {
   capabilities: Capabilities;
   /** Empty for providers that only have one way of looking at a location. */
   views?: ViewDto[];
+  /**
+   * What Ctrl+F offers to change, for the worlds that are a filter rather than a
+   * path. Absent where there is nothing to ask.
+   */
+  filter?: FilterDto;
   /**
    * Entry id to put the cursor on, sent only when a remembered position is being
    * restored. Absent on every other listing, so the pane keeps deciding for
@@ -156,8 +195,11 @@ export type HostMessage =
     defaults: TransferOptions;
     /** What the codepage picker in the F5 dialog offers. */
     codepages: string[];
+    favourites: FavouriteDto[];
   }
   | { type: 'listing'; pane: PaneId; listing: ListingDto }
+  /** The saved views changed — by Ctrl+D, or by an edit to `mc.favourites`. */
+  | { type: 'favourites'; favourites: FavouriteDto[] }
   | { type: 'busy'; pane: PaneId; busy: boolean }
   /**
    * Whether the host is still working on something the user asked for. Unlike
@@ -213,7 +255,15 @@ export type ClientMessage =
    */
   | { type: 'cursor'; pane: PaneId; location: PaneLocation; entryId: string }
   | { type: 'cancelTransfer'; id: string }
-  | { type: 'commandLine'; pane: PaneId; line: string };
+  | { type: 'commandLine'; pane: PaneId; line: string }
+  /**
+   * The filter dialog's answers, keyed by the field ids the provider declared.
+   * Where that lands is the provider's business, not the webview's.
+   */
+  | { type: 'setFilter'; pane: PaneId; values: Record<string, string> }
+  /** Saving over an existing name replaces it — the name is the identity. */
+  | { type: 'saveFavourite'; name: string; location: PaneLocation }
+  | { type: 'removeFavourite'; name: string };
 
 /**
  * Whether a message is work the user is waiting for, and so should be shown as

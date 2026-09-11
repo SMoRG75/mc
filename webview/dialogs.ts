@@ -1,4 +1,6 @@
-import type { DatasetSpec, TransferOptions } from '../src/shared/protocol';
+import type {
+  DatasetSpec, FavouriteDto, FilterDto, PaneLocation, TransferOptions,
+} from '../src/shared/protocol';
 
 let openCount = 0;
 
@@ -82,6 +84,126 @@ export function confirm(title: string, detail: string): Promise<boolean | undefi
     box.querySelector('[data-yes]')?.addEventListener('click', () => resolve(true));
     return box;
   });
+}
+
+/**
+ * Ctrl+F: the pane's filter as fields.
+ *
+ * Entirely driven by what the provider declared, so this one dialog is the JES
+ * owner/prefix form without knowing that is what it is. The values come back
+ * keyed by the same field ids.
+ */
+export function filterDialog(spec: FilterDto): Promise<Record<string, string> | undefined> {
+  return modal<Record<string, string>>((resolve) => {
+    const box = document.createElement('form');
+    box.innerHTML = `
+      <div class="mh">${escapeHtml(spec.title)}<span>Ctrl+F</span></div>
+      <div class="mb">
+        ${spec.fields.map((field) => `
+          <label class="row"><span>${escapeHtml(field.label)}</span>
+            ${field.choices
+    ? `<select class="field" name="${escapeHtml(field.id)}">${field.choices.map((choice) => `
+                  <option value="${escapeHtml(choice.value)}"${choice.value === field.value ? ' selected' : ''}>
+                    ${escapeHtml(choice.label)}</option>`).join('')}</select>`
+    : `<input class="field" name="${escapeHtml(field.id)}" spellcheck="false"
+                 autocapitalize="off" value="${escapeHtml(field.value)}">`}</label>
+          ${field.hint ? `<p class="hint">${escapeHtml(field.hint)}</p>` : ''}`).join('')}
+      </div>
+      <div class="mf">
+        <button type="button" class="btn" data-cancel>Cancel</button>
+        <button type="submit" class="btn pri">Show</button>
+      </div>`;
+
+    const form = box as HTMLFormElement;
+    box.querySelector('[data-cancel]')?.addEventListener('click', () => resolve(undefined));
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      resolve(Object.fromEntries(
+        spec.fields.map((field) => [field.id, String(data.get(field.id) ?? field.value)]),
+      ));
+    });
+    // The field is nearly always being replaced rather than edited.
+    queueMicrotask(() => (box.querySelector('input') as HTMLInputElement | null)?.select());
+    return box;
+  });
+}
+
+/** What Ctrl+D was closed with. */
+export type FavouriteChoice =
+  | { type: 'go'; location: PaneLocation }
+  | { type: 'save'; name: string }
+  | { type: 'remove'; name: string };
+
+/**
+ * Ctrl+D: the saved views, and the chance to add the one on screen.
+ *
+ * Every button closes the dialog. Removing two of them is therefore two trips —
+ * which is the right trade for a list that is read far more often than it is
+ * edited, and keeps the dialog free of any state of its own.
+ */
+export function favouritesDialog(
+  favourites: FavouriteDto[], suggestedName: string,
+): Promise<FavouriteChoice | undefined> {
+  return modal<FavouriteChoice>((resolve) => {
+    const box = document.createElement('form');
+    box.className = 'favs';
+    box.innerHTML = `
+      <div class="mh">Saved views<span>Ctrl+D</span></div>
+      <div class="mb">
+        ${favourites.length === 0
+    ? '<p class="hint flush">Nothing saved yet. Name what the pane is showing below and it turns up here — and as a tab in the pane header whenever you are in that world.</p>'
+    : `<div class="favlist">${favourites.map((favourite, index) => `
+            <div class="fav">
+              <button type="button" class="favgo" data-go="${index}">
+                <b>${escapeHtml(favourite.name)}</b>
+                <i>${escapeHtml(describeLocation(favourite.location))}</i>
+              </button>
+              <button type="button" class="favdel" data-remove="${index}" title="Remove">✕</button>
+            </div>`).join('')}</div>`}
+        <label class="row"><span>Save this view as</span>
+          <input class="field" name="name" spellcheck="false" placeholder="Name"></label>
+        <p class="hint">Saving over a name that is taken replaces it.</p>
+      </div>
+      <div class="mf">
+        <button type="button" class="btn" data-cancel>Close</button>
+        <button type="submit" class="btn pri">Save</button>
+      </div>`;
+
+    const form = box as HTMLFormElement;
+    const input = form.elements.namedItem('name') as HTMLInputElement;
+    input.value = suggestedName;
+
+    for (const button of box.querySelectorAll('[data-go]')) {
+      button.addEventListener('click', () => {
+        const favourite = favourites[Number((button as HTMLElement).dataset.go)];
+        if (favourite) resolve({ type: 'go', location: favourite.location });
+      });
+    }
+    for (const button of box.querySelectorAll('[data-remove]')) {
+      button.addEventListener('click', () => {
+        const favourite = favourites[Number((button as HTMLElement).dataset.remove)];
+        if (favourite) resolve({ type: 'remove', name: favourite.name });
+      });
+    }
+    box.querySelector('[data-cancel]')?.addEventListener('click', () => resolve(undefined));
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const name = input.value.trim();
+      resolve(name ? { type: 'save', name } : undefined);
+    });
+    // The suggested name says exactly what is being saved, and is nearly always
+    // worth shortening — so it is selected, not just focused.
+    queueMicrotask(() => input.select());
+    return box;
+  });
+}
+
+/** `LPAR1 · JES · owner=SANJ` — enough to tell two saved views apart. */
+function describeLocation(location: PaneLocation): string {
+  const world = { local: 'Local', ds: 'DS', uss: 'USS', jes: 'JES' }[location.kind];
+  const where = location.profile || (location.kind === 'local' ? 'this PC' : 'default profile');
+  return `${where} · ${world} · ${location.path || '(top)'}`;
 }
 
 /**
