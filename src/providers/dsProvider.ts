@@ -30,12 +30,27 @@ const DATASET_COLUMNS: ColumnDef[] = [
   { id: 'vol', title: 'Volume', width: 20 },
 ];
 
+/** The ISPF 3.4 member list: statistics kept for members edited under ISPF. */
 const MEMBER_COLUMNS: ColumnDef[] = [
-  { id: 'name', title: 'Member', width: 38 },
-  { id: 'vers', title: 'VV.MM', width: 14 },
-  { id: 'changed', title: 'Changed', width: 26 },
-  { id: 'size', title: 'Size', width: 10, align: 'right' },
-  { id: 'user', title: 'ID', width: 12 },
+  { id: 'name', title: 'Member', width: 30 },
+  { id: 'vers', title: 'VV.MM', width: 10 },
+  { id: 'created', title: 'Created', width: 16 },
+  { id: 'changed', title: 'Changed', width: 22 },
+  { id: 'size', title: 'Size', width: 8, align: 'right' },
+  { id: 'init', title: 'Init', width: 8, align: 'right' },
+  { id: 'mod', title: 'Mod', width: 8, align: 'right' },
+  { id: 'user', title: 'ID', width: 10 },
+];
+
+/** Load libraries carry no ISPF statistics; the binder's attributes take their place. */
+const LOAD_COLUMNS: ColumnDef[] = [
+  { id: 'name', title: 'Member', width: 28 },
+  { id: 'alias', title: 'Alias-of', width: 16 },
+  { id: 'size', title: 'Size', width: 12, align: 'right' },
+  { id: 'amode', title: 'AMODE', width: 10 },
+  { id: 'rmode', title: 'RMODE', width: 10 },
+  { id: 'ac', title: 'AC', width: 6, align: 'right' },
+  { id: 'attr', title: 'Attr', width: 18 },
 ];
 
 export class DsProvider implements PaneProvider {
@@ -155,6 +170,7 @@ export class DsProvider implements PaneProvider {
 
     const items = (members.apiResponse?.items ?? []) as ZosmfMember[];
     const limit = this.settings.pageSize();
+    const load = isLoadLibrary(attributes?.recfm, items);
 
     const entries: Entry<DsRef>[] = items.slice(0, limit).map((item) => ({
       // The LRECL is the PDS's, not the member's, and it is what Shift+F3 has to
@@ -165,14 +181,8 @@ export class DsProvider implements PaneProvider {
         id: `${dsname}(${item.member})`,
         name: item.member,
         kind: 'file',
-        size: item.mnorc,
-        cells: {
-          name: item.member,
-          vers: item.vers !== undefined ? `${pad2(item.vers)}.${pad2(item.mod ?? 0)}` : '',
-          changed: [item.m4date, item.mtime].filter(Boolean).join(' '),
-          size: item.mnorc !== undefined ? String(item.mnorc) : '',
-          user: item.user ?? '',
-        },
+        size: load ? hex(item.size) : item.cnorc,
+        cells: load ? loadCells(item) : statisticsCells(item),
       },
     }));
 
@@ -182,7 +192,7 @@ export class DsProvider implements PaneProvider {
 
     return {
       title: shape ? `${dsname} (${shape})` : dsname,
-      columns: MEMBER_COLUMNS,
+      columns: load ? LOAD_COLUMNS : MEMBER_COLUMNS,
       entries,
       status: attributes?.vol ? `VOL=${attributes.vol}` : `${items.length} member${items.length === 1 ? '' : 's'}`,
       truncated: items.length > limit,
@@ -479,12 +489,70 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }
 
+/**
+ * RECFM=U is the giveaway, but the dataset attributes are a best-effort second
+ * listing that may not have come back — so the members themselves get a vote.
+ */
+function isLoadLibrary(recfm: string | undefined, items: ZosmfMember[]): boolean {
+  if (recfm) return recfm.startsWith('U');
+  return items.some((item) => item.amode !== undefined || item.attr !== undefined);
+}
+
+/**
+ * ISPF statistics. Members written by anything but ISPF carry none at all, so
+ * every cell is optional and an empty column is the honest answer, not a bug.
+ */
+function statisticsCells(item: ZosmfMember): Record<string, string> {
+  return {
+    name: item.member,
+    vers: item.vers !== undefined ? `${pad2(item.vers)}.${pad2(item.mod ?? 0)}` : '',
+    created: item.c4date ?? '',
+    changed: [item.m4date, item.mtime].filter(Boolean).join(' '),
+    // Size is the current record count. mnorc, which this used to show, counts
+    // only the lines changed since the last save — 0 for almost every member.
+    size: count(item.cnorc),
+    init: count(item.inorc),
+    mod: count(item.mnorc),
+    user: item.user ?? '',
+  };
+}
+
+function loadCells(item: ZosmfMember): Record<string, string> {
+  const size = hex(item.size);
+  return {
+    name: item.member,
+    alias: item['alias-of'] ?? '',
+    size: size !== undefined ? String(size) : '',
+    amode: item.amode ?? '',
+    rmode: item.rmode ?? '',
+    ac: item.ac ?? '',
+    attr: item.attr ?? '',
+  };
+}
+
+function count(value: number | undefined): string {
+  return value !== undefined ? String(value) : '';
+}
+
+/** Load module sizes come back as hex, the way the binder reports them. */
+function hex(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number.parseInt(value, 16);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
 /** Shapes of the z/OSMF list responses we actually read. */
 interface ZosmfDataSet {
   dsname: string; dsorg?: string; recfm?: string; lrecl?: string;
   used?: string; vol?: string; migr?: string;
 }
 interface ZosmfMember {
-  member: string; vers?: number; mod?: number; m4date?: string;
-  mtime?: string; mnorc?: number; user?: string;
+  member: string;
+  // ISPF statistics, present only on members an editor kept them for.
+  vers?: number; mod?: number; c4date?: string; m4date?: string;
+  mtime?: string; cnorc?: number; inorc?: number; mnorc?: number;
+  user?: string; sclm?: string;
+  // Binder attributes, returned instead for load libraries.
+  ac?: string; amode?: string; rmode?: string; attr?: string;
+  size?: string; ssi?: string; ttr?: string; 'alias-of'?: string;
 }
