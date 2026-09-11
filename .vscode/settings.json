@@ -1,0 +1,12 @@
+{
+  // F5 kunne ikke starte: VS Code beder js-debug om netværksvisningen, js-debug
+  // sender 'Network.enable' til ekstensionsværten, og den abortere (exit 134)
+  // en tredjedel af et sekund senere — værtens inspector har slet ikke et
+  // Network-domæne, hvilket den selv svarer på 'Schema.getDomains' lige inden.
+  // Nedbruddet sker før nogen extension er indlæst.
+  //
+  // Sat her og ikke i brugerindstillingerne, fordi det hører til dette projekt:
+  // enhver der kloner og trykker F5 rammer det samme. Kan fjernes igen den dag
+  // VS Code svarer pænt på domæner den ikke har (set i 1.137.0).
+  "debug.javascript.enableNetworkView": false
+}
