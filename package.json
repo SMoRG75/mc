@@ -38,6 +38,14 @@
         "title": "Mainframe Commander: Forward key to panel"
       }
     ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "mc.key",
+          "when": "false"
+        }
+      ]
+    },
     "keybindings": [
       {
         "command": "mc.open",
