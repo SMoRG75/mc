@@ -12,4 +12,12 @@ tsconfig.json
 *.vsix
 **/*.map
 **/*.ts
+# The credential manager is the only package left in node_modules. Its Rust
+# sources and install-time check are not needed at runtime; lib/index.js,
+# src/keyring/index.js and prebuilds/*.node are.
+node_modules/@zowe/secrets-for-zowe-sdk/src/keyring/**/*.rs
+node_modules/@zowe/secrets-for-zowe-sdk/src/keyring/Cargo.*
+node_modules/@zowe/secrets-for-zowe-sdk/src/keyring/napi.json
+node_modules/@zowe/secrets-for-zowe-sdk/src/keyring/*.md
+node_modules/@zowe/secrets-for-zowe-sdk/scripts/**
 !dist/**

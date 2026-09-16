@@ -29,10 +29,9 @@ One package covers every platform: the only native code is the Zowe credential
 manager, and it ships a prebuilt binary for each of the eleven targets in the
 same npm package — so there is no `vsce package --target` per architecture.
 [`scripts/package-vsix.mjs`](scripts/package-vsix.mjs) checks that before
-handing over to `vsce`, because the Zowe SDKs are deliberately unbundled: a
-package built without them in `node_modules` installs perfectly and then throws
-`Cannot find module '@zowe/imperative'` the first time someone presses
-`Ctrl+Shift+M`.
+handing over to `vsce`, because the credential manager is the one package that
+cannot be bundled: a package built without it in `node_modules` installs
+perfectly and then reads every secure value in `zowe.config.json` as empty.
 
 ## How it fits together
 
@@ -46,7 +45,7 @@ src/
 │  ├─ provider.ts          The PaneProvider interface + registry
 │  ├─ cursorHistory.ts     Which row the cursor was on, per listing
 │  ├─ ebcdic.ts            Local EBCDIC decoding for Shift+F3
-│  ├─ transferQueue.ts     Background queue for F5/F6 with concurrency and cancellation
+│  ├─ transferQueue.ts     Background queue for F5 with concurrency and cancellation
 │  ├─ editorBridge.ts      FileSystemProvider, so F3/F4 open in a real editor
 │  ├─ text.ts              Text/binary choice and LRECL fitting
 │  ├─ settings.ts          Typed reading of the mc.* settings
@@ -63,8 +62,10 @@ webview/
 ├─ index.ts                App: layout, messages, actions
 ├─ pane.ts                 One pane: header, path, rows, footer, selection
 ├─ virtualList.ts          Windowed rendering — only visible rows are built
-├─ keymap.ts               Key → action, with dedup of forwarded keys
-├─ dialogs.ts              F5 transfer, F7 allocation, Ctrl+F filter, Ctrl+D saved views
+├─ keymap.ts               Key → action, with dedup of forwarded keys, and the F1 list
+├─ dialogs.ts              F1 help, F5 transfer, F7 allocation, Ctrl+F filter, Ctrl+D saved views, prompts
+├─ vscode.ts               The webview API handle; every request to the host goes through send()
+├─ progress.ts             The busy pointer — from the webview, the host and the transfer queue
 └─ style.css               Total Commander layout in the user's VS Code theme
 ```
 
@@ -118,8 +119,8 @@ special case, just `source.read()` followed by `target.write()`.
   qualifier, which the user should not get their own put on top of.
 - **File system provider rather than temp files.** F3/F4 open `mc://LPAR1/BACKUP01`,
   so syntax colours, diff, search and `Ctrl+S` work as on a local file. The
-  read-only view uses its own scheme (`mc-view`), because VS Code can only set
-  readonly per provider.
+  read-only views use schemes of their own — `mc-view` for F3 and `mc-ebcdic`
+  for Shift+F3 — because VS Code can only set readonly per provider.
 - **The codepage is picked, not typed, and is remembered.** `IBM-277` is only
   right in Denmark and Norway, so the F5 dialog offers the national EBCDIC pages
   by country and writes the choice back to `mc.transfer.codepage` — into
@@ -160,16 +161,20 @@ special case, just `source.read()` followed by `target.write()`.
 - **`auto` only guesses binary on known extensions.** Treating an unknown file as
   text is recoverable; treating it as binary silently ruins the EBCDIC
   conversion.
-- **The Zowe packages are not bundled.** Imperative loads plugins and credential
-  managers with dynamic `require()` calls that a bundler cannot follow. They are
-  marked `external` in `esbuild.mjs` and live in `node_modules`.
+- **The Zowe SDKs are bundled; the credential manager is not.** Left in
+  `node_modules`, the SDKs drag in some 5,000 files. Imperative's dynamic
+  `require()` calls — command handlers, plugins, custom credential managers —
+  all belong to the CLI and are never reached through `ProfileInfo` and the REST
+  client, so esbuild can take the rest. `@zowe/secrets-for-zowe-sdk` loads a
+  native `.node` binary, so it stays `external` in `esbuild.mjs` and is the only
+  runtime dependency; the SDKs themselves are devDependencies.
 
 ## Status
 
-The skeleton compiles and all four providers are written against the verified
-Zowe v8 API. The following is missing before it is usable in practice:
+All four providers are written against the Zowe v8 API and have been run
+against a real LPAR through z/OSMF. Still missing:
 
-- [x] Run against a real LPAR — nothing here has seen z/OSMF yet
+- [x] Run against a real LPAR
 - [ ] Streaming for large transfers (reads and writes the whole buffer today)
 - [ ] Recursive copying of directories and PDSes
 - [ ] `Alt+F7` search

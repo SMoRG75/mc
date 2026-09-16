@@ -20,19 +20,21 @@ const extension = {
   platform: 'node',
   target: 'node20',
   format: 'cjs',
-  // 'vscode' is provided by the host. The Zowe packages stay external because
-  // Imperative resolves plugins and credential managers at runtime with
-  // dynamic require() calls that a bundler cannot follow — they ship in
-  // node_modules instead (see .vscodeignore).
+  // 'vscode' is provided by the host. The Zowe SDKs are bundled: their
+  // dependency trees are ~5,000 files, which is what vsce warns about. The
+  // dynamic require() calls in Imperative that a bundler cannot follow are all
+  // on the CLI's side of it — command handlers, plugins, custom credential
+  // managers, token auto-store — and ProfileInfo plus the REST client do not
+  // reach them.
   //
-  // @zowe/secrets-for-zowe-sdk is doubly external: it is a native module that
-  // loads a prebuilt .node binary, which a bundler cannot inline at all.
-  // Imperative declares it only as a devDependency and require()s it at
-  // runtime, so *we* have to depend on it — without it the credential manager
-  // fails to load and every secure value in zowe.config.json reads as empty.
-  external: ['vscode', '@zowe/imperative', '@zowe/core-for-zowe-sdk',
-             '@zowe/zos-files-for-zowe-sdk', '@zowe/zos-jobs-for-zowe-sdk',
-             '@zowe/secrets-for-zowe-sdk'],
+  // @zowe/secrets-for-zowe-sdk is the exception: it is a native module that
+  // loads a prebuilt .node binary, which a bundler cannot inline at all, so it
+  // stays external and ships in node_modules as the only runtime dependency.
+  // Imperative finds it with require.resolve() from the bundle's own location,
+  // which walks up from dist/ to the extension's node_modules. Without it the
+  // credential manager fails to load and every secure value in
+  // zowe.config.json reads as empty.
+  external: ['vscode', '@zowe/secrets-for-zowe-sdk'],
 };
 
 const webview = {

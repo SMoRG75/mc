@@ -433,16 +433,16 @@
     "vscode:prepublish": "npm run typecheck && npm run package"
   },
   "dependencies": {
-    "@zowe/core-for-zowe-sdk": "^8.37.0",
-    "@zowe/imperative": "^8.37.0",
-    "@zowe/secrets-for-zowe-sdk": "^8.37.0",
-    "@zowe/zos-files-for-zowe-sdk": "^8.37.0",
-    "@zowe/zos-jobs-for-zowe-sdk": "^8.37.0"
+    "@zowe/secrets-for-zowe-sdk": "^8.37.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.3",
     "@types/vscode": "^1.138.0",
     "@vscode/vsce": "^4.0.0",
+    "@zowe/core-for-zowe-sdk": "^8.37.0",
+    "@zowe/imperative": "^8.37.0",
+    "@zowe/zos-files-for-zowe-sdk": "^8.37.0",
+    "@zowe/zos-jobs-for-zowe-sdk": "^8.37.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
   }

@@ -6,10 +6,10 @@
  * whatever was left in dist/ from the last watch session.
  *
  * What is here instead of a bare `vsce package` is the check that this
- * extension can fail: the Zowe SDKs are deliberately *not* bundled (see the
- * comment in esbuild.mjs), so they have to travel in node_modules. A package
- * built with them missing installs perfectly and then throws "Cannot find
- * module '@zowe/imperative'" the first time someone presses Ctrl+Shift+M.
+ * extension can fail: the Zowe SDKs are bundled, but the credential manager
+ * cannot be (see the comment in esbuild.mjs), so it has to travel in
+ * node_modules. A package built with it missing installs perfectly and then
+ * reads every secure value in zowe.config.json as empty.
  */
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -23,7 +23,7 @@ const notes = [];
 
 const exists = (...parts) => fs.existsSync(path.join(root, ...parts));
 
-/* The unbundled runtime dependencies must be on disk to be packaged. */
+/* The unbundled runtime dependency must be on disk to be packaged. */
 for (const name of Object.keys(manifest.dependencies ?? {})) {
   if (!exists('node_modules', ...name.split('/'))) {
     problems.push(`${name} is not installed — run 'npm install' before packaging.`);
