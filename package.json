@@ -3,9 +3,17 @@
   "displayName": "Mainframe Commander",
   "description": "Total Commander-style dual-pane file manager for z/OS, powered by Zowe.",
   "version": "0.1.0",
-  "publisher": "san",
+  "publisher": "ubidk",
   "license": "EPL-2.0",
+  "author": {
+    "name": "ubi.dk",
+    "url": "https://ubi.dk"
+  },
   "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#151b27",
+    "theme": "dark"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/san/mainframe-commander.git"

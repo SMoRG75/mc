@@ -184,4 +184,4 @@ against a real LPAR through z/OSMF. Still missing:
 
 ## License
 
-EPL-2.0, like the rest of the Zowe ecosystem.
+Copyright © ubi.dk. Released under EPL-2.0, like the rest of the Zowe ecosystem.
