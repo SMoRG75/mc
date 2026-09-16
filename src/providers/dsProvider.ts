@@ -217,7 +217,8 @@ export class DsProvider implements PaneProvider {
     if (ref.migrated) {
       throw new UserFacingError(
         `${ref.dsname} is migrated (HSM).`,
-        'The dataset has to be recalled before it can be read. Use F2 → Recall, or reach it through TSO.',
+        `The dataset has to be recalled before it can be read: HRECALL '${ref.dsname}' in TSO, `
+        + `or \`zowe zos-files recall data-set "${ref.dsname}"\` in a terminal. Press F2 once it is back.`,
       );
     }
     return isPartitioned(ref.dsorg) ? { ...loc, path: ref.dsname } : undefined;
