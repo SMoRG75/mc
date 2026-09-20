@@ -2,6 +2,7 @@
 .claude/**
 .gitignore
 src/**
+test/**
 webview/**
 docs/**
 out/**

@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build:
+    # Both, because the extension is developed on Windows and the build scripts
+    # touch paths: a separator bug in one of them is invisible on the machine it
+    # was written on.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # npm ci, not npm install: it installs exactly what package-lock.json
+      # pins and fails if the two have drifted, so a green build here is a
+      # build of the same dependency tree the author has.
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

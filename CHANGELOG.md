@@ -29,4 +29,7 @@ short of 1.0 on the points listed under *Not yet* below.
 - `Alt+F7` search, TSO and console commands on the command line.
 - Recall of migrated data sets. They are listed and marked, and opening one
   names the `HRECALL` to run, but the extension will not issue it for you.
-- Automated tests.
+- Tests against a real host. The parts that can lose data quietly — the
+  EBCDIC tables, LRECL fitting, transfer-mode choice and error parsing —
+  are covered by unit tests, but the four providers are not: they need an
+  LPAR to talk to.

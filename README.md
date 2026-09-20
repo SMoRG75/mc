@@ -19,7 +19,9 @@ command **Mainframe Commander: Open** (`Ctrl+Shift+Alt+M`). `F1` in the panel li
 every shortcut; the list itself is `SHORTCUTS` in
 [`webview/keymap.ts`](webview/keymap.ts), next to the bindings it describes.
 
-`npm run typecheck` runs TypeScript over both the extension and the webview half.
+`npm run typecheck` runs TypeScript over both the extension and the webview
+half, and `npm test` runs the unit tests. Both run in CI on Linux and
+Windows, and again before `vsce` packages anything.
 
 ```bash
 npm run vsix           # -> mainframe-commander-<version>.vsix
@@ -179,8 +181,10 @@ against a real LPAR through z/OSMF. Still missing:
 - [ ] Recursive copying of directories and PDSes
 - [ ] `Alt+F7` search
 - [ ] TSO and console commands on the command line
-- [ ] Recall of migrated data sets (shown, but refused for now)
-- [ ] Tests
+- [ ] Recall of migrated data sets (shown, and the `HRECALL` named, but not issued)
+- [x] Unit tests for the parts that can lose data quietly — the EBCDIC
+      tables, LRECL fitting, transfer-mode choice and error parsing
+- [ ] Tests for the providers, which need a host to talk to
 
 ## License
 

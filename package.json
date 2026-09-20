@@ -32,9 +32,16 @@
     "mainframe",
     "zowe",
     "z/OS",
+    "zosmf",
     "mvs",
     "uss",
     "jes",
+    "jcl",
+    "pds",
+    "dataset",
+    "tso",
+    "file manager",
+    "dual-pane",
     "commander"
   ],
   "activationEvents": [],
@@ -426,7 +433,8 @@
     "package": "node esbuild.mjs --production",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p webview/tsconfig.json",
     "vsix": "node scripts/package-vsix.mjs",
-    "vscode:prepublish": "npm run typecheck && npm run package"
+    "test": "node scripts/run-tests.mjs",
+    "vscode:prepublish": "npm run typecheck && npm test && npm run package"
   },
   "dependencies": {
     "@zowe/secrets-for-zowe-sdk": "^8.37.0"
