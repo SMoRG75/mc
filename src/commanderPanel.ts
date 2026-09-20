@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { randomBytes } from 'node:crypto';
 import {
   reportsProgress,
   type ClientMessage, type HostMessage, type PaneId, type PaneKind, type PaneLocation,
@@ -681,7 +682,7 @@ export class CommanderPanel {
     const asset = (file: string) => webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', file),
     );
-    const nonce = nonceOf(32);
+    const nonce = nonceOf(16);
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -706,13 +707,14 @@ function applyPattern(pattern: string, sourceName: string): string {
   return pattern.replace(/\*/g, sourceName);
 }
 
-function nonceOf(length: number): string {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let out = '';
-  for (let i = 0; i < length; i += 1) {
-    out += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return out;
+/**
+ * A CSP nonce has to be unguessable, so it comes from the CSPRNG rather than
+ * from `Math.random()` — which is seeded predictably and is not a security
+ * primitive. 16 bytes is the amount the CSP spec asks for; base64 keeps it to
+ * source-expression characters.
+ */
+function nonceOf(bytes: number): string {
+  return randomBytes(bytes).toString('base64');
 }
 
 export function transferDefaults(): TransferOptions {
