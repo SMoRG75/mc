@@ -211,13 +211,13 @@ class App {
       fill.style.width = `${Math.round((first.progress ?? 0) * 100)}%`;
       bar.append(fill);
       const count = document.createElement('span');
-      count.textContent = `${jobs.length - running.length + 1} af ${jobs.length}`;
+      count.textContent = `${jobs.length - running.length + 1} of ${jobs.length}`;
       this.statusBar.append(label, bar, count);
     }
     for (const job of failed) {
       const error = document.createElement('span');
       error.className = 'error';
-      error.textContent = `${job.label}: ${job.error ?? 'fejlede'}`;
+      error.textContent = `${job.label}: ${job.error ?? 'failed'}`;
       this.statusBar.append(error);
     }
   }

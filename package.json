@@ -2,7 +2,7 @@
   "name": "mainframe-commander",
   "displayName": "Mainframe Commander",
   "description": "Total Commander-style dual-pane file manager for z/OS, powered by Zowe.",
-  "version": "0.1.0",
+  "version": "0.9.0",
   "publisher": "ubidk",
   "license": "EPL-2.0",
   "author": {
@@ -16,8 +16,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/san/mainframe-commander.git"
+    "url": "https://github.com/SMoRG75/mc.git"
   },
+  "bugs": {
+    "url": "https://github.com/SMoRG75/mc/issues"
+  },
+  "homepage": "https://github.com/SMoRG75/mc#readme",
   "engines": {
     "vscode": "^1.138.0"
   },
@@ -58,8 +62,8 @@
     "keybindings": [
       {
         "command": "mc.open",
-        "key": "ctrl+shift+m",
-        "mac": "cmd+shift+m"
+        "key": "ctrl+shift+alt+m",
+        "mac": "cmd+shift+alt+m"
       },
       {
         "command": "mc.key",

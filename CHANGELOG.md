@@ -1,8 +1,9 @@
 # Changelog
 
-## 0.1.0
+## 0.9.0 — 2026-09-20
 
-First release.
+First release. Feature-complete for day-to-day work on the four worlds, but
+short of 1.0 on the points listed under *Not yet* below.
 
 - Dual-pane, Total Commander-style file manager for z/OS in a VS Code panel,
   connecting through the existing Zowe `zowe.config.json`.
@@ -18,3 +19,14 @@ First release.
   filter (`Ctrl+F`) and auto-refresh.
 - Saved views (`Ctrl+D`), quick filter, column sorting, and panes that reopen
   where they were left.
+
+### Not yet
+
+- Streaming for large transfers — a copy reads and writes the whole buffer, so
+  a very large data set or file is held in memory end to end.
+- Recursive copying of directories and PDSes. `F5` on a folder is refused
+  rather than attempted.
+- `Alt+F7` search, TSO and console commands on the command line.
+- Recall of migrated data sets. They are listed and marked, and opening one
+  names the `HRECALL` to run, but the extension will not issue it for you.
+- Automated tests.

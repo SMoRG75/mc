@@ -15,7 +15,7 @@ npm run build          # or: npm run watch
 ```
 
 Press `F5` in VS Code to start an Extension Development Host, and run the
-command **Mainframe Commander: Open** (`Ctrl+Shift+M`). `F1` in the panel lists
+command **Mainframe Commander: Open** (`Ctrl+Shift+Alt+M`). `F1` in the panel lists
 every shortcut; the list itself is `SHORTCUTS` in
 [`webview/keymap.ts`](webview/keymap.ts), next to the bindings it describes.
 
