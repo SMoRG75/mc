@@ -1,6 +1,7 @@
 // Build script for both bundles: the extension (Node, CommonJS) and the
 // webview (browser, ESM). Run with --watch during development.
 import * as esbuild from 'esbuild';
+import { noticesPlugin } from './scripts/notices.mjs';
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
@@ -35,6 +36,8 @@ const extension = {
   // credential manager fails to load and every secure value in
   // zowe.config.json reads as empty.
   external: ['vscode', '@zowe/secrets-for-zowe-sdk'],
+  // What gets bundled is redistributed, so its licenses have to ship too.
+  plugins: [noticesPlugin('dist/THIRD-PARTY-NOTICES.txt')],
 };
 
 const webview = {

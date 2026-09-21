@@ -189,3 +189,7 @@ against a real LPAR through z/OSMF. Still missing:
 ## License
 
 Copyright © ubi.dk. Released under EPL-2.0, like the rest of the Zowe ecosystem.
+
+The extension bundles the Zowe SDKs (EPL-2.0) and their dependencies. Their
+licenses, and where to get the Zowe source, are in `dist/THIRD-PARTY-NOTICES.txt`,
+which every build regenerates and the `.vsix` includes.
