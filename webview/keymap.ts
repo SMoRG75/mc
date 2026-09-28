@@ -138,6 +138,7 @@ export const SHORTCUTS: readonly {
     rows: [
       ['cd <path>', 'Go there in the active pane'],
       ['submit <name>', 'Submit that row'],
+      ['recall <name>', 'Recall a migrated data set — Enter on one asks'],
       ['refresh', 'Same as F2'],
     ],
     note: 'Esc leaves the command line and gives the keyboard back to the pane.',

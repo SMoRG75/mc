@@ -23,7 +23,7 @@ let listening = false;
 /** The provider methods that do something, as opposed to working something out. */
 const TRACED = new Set<string>([
   'list', 'read', 'write', 'readTo', 'writeFrom', 'exists',
-  'remove', 'rename', 'create', 'submit', 'folder',
+  'remove', 'rename', 'create', 'submit', 'folder', 'recall',
 ]);
 
 /**

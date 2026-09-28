@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.13.0 — 2026-09-28
+
+- Migrated data sets can be recalled from the pane. Enter, F3 or F4 on one
+  asks whether to recall it; `recall <name>` (or `hrecall`) on the command line
+  does it without asking. The recall is queued at DFSMShsm rather than waited
+  on at z/OSMF — a recall from tape can take many minutes, and a waiting
+  request would hold up every listing behind it — and a notification waits
+  for it instead, which can be dismissed. Once it is back, the panes showing
+  it are refreshed and it opens, if the pane is still where it was.
+- F5 leaves migrated data sets out, with the reason, rather than starting a
+  recall for each one; F10 refuses one the same way.
+- Stopping a read after its response had ended — which is what Alt+F7 does
+  when it finds the text in a small member, since z/OSMF answers gzipped and
+  the hit arrives only once inflated — destroyed a keep-alive socket nobody
+  was listening to, and threw an uncaught error in the extension host.
+- `npm run test:host` runs the providers against a real z/OSMF: MVS, USS and
+  JES. Text and binary round trips, a check that æøå really are IBM-277 on the
+  host, streaming both ways, LRECL fitting, rename and delete, folders made
+  and reused, page-sized listings, concurrent listings, Alt+F7, F5 of a whole
+  tree there and back, and reading spool. It found the socket error above.
+
 ## 0.12.0 — 2026-09-28
 
 - `Alt+F7` finds files below where the pane is standing, in any of the four

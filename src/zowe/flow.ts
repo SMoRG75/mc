@@ -72,6 +72,8 @@ export function pacedDownload<T>(
 function track<T>(signal: AbortSignal, hook: Hook, call: () => Promise<T>): Promise<T> {
   listen();
   const requests: ClientRequest[] = [];
+  /** Each request's response, once there is one. */
+  const responses = new WeakMap<ClientRequest, IncomingMessage>();
   return new Promise<T>((resolve, reject) => {
     let settled = false;
     const settle = (outcome: () => void) => {
@@ -81,9 +83,20 @@ function track<T>(signal: AbortSignal, hook: Hook, call: () => Promise<T>): Prom
       outcome();
     };
     const fail = (err: unknown) => settle(() => {
-      // Not ECONNRESET: the SDK retries a request that fails with that code on
-      // a reused socket, which is the opposite of what cancelling means.
-      for (const request of requests) request.destroy(new StoppedError());
+      for (const request of requests) {
+        // Only what is still under way. A response that has come in full has
+        // handed its socket back to the keep-alive pool, and destroying the
+        // request then destroys a pooled socket nobody listens to: an uncaught
+        // error. That is no corner case — z/OSMF answers gzipped, the SDK
+        // inflates on the thread pool, and so a search reading for its first
+        // hit finds it, and stops the read, after the last byte has arrived.
+        if (responses.get(request)?.complete) continue;
+        // Somewhere to go regardless, in case the SDK is no longer listening.
+        request.on('error', () => undefined);
+        // Not ECONNRESET: the SDK retries a request that fails with that code
+        // on a reused socket, which is the opposite of what cancelling means.
+        request.destroy(new StoppedError());
+      }
       reject(err);
     });
     const onAbort = () => fail(signal.reason ?? new StoppedError());
@@ -97,6 +110,7 @@ function track<T>(signal: AbortSignal, hook: Hook, call: () => Promise<T>): Prom
     scope.run((request) => {
       requests.push(request);
       request.once('response', (response: IncomingMessage) => {
+        responses.set(request, response);
         response.once('close', () => {
           if (!response.complete) fail(new Error('The connection closed before the transfer was complete.'));
         });

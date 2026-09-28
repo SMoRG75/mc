@@ -23,6 +23,21 @@ every shortcut; the list itself is `SHORTCUTS` in
 half, and `npm test` runs the unit tests. Both run in CI on Linux and
 Windows, and again before `vsce` packages anything.
 
+`npm run test:host` runs the providers against a real z/OSMF, through the
+default Zowe profile (or `MC_HOST_PROFILE`), which CI has no way to reach. It
+writes members into the PDS named by `MC_HOST_PDS`, and files into the USS
+directory named by `MC_HOST_USS_DIR` — only names starting with `MCT` or `mct`,
+all removed again at the end, and never the data set or directory itself — and
+reads JES without changing anything. Either of the two may be left out, and its
+tests are skipped. `MC_HOST_DEBUG=1` shows every request.
+
+```bash
+MC_HOST_PDS=USER.SCRATCH MC_HOST_USS_DIR=/u/user/scratch npm run test:host
+```
+
+In Git Bash, prefix it with `MSYS_NO_PATHCONV=1`, or the USS path arrives as a
+Windows one.
+
 ```bash
 npm run vsix           # -> mainframe-commander-<version>.vsix
 ```
@@ -203,18 +218,32 @@ special case, just `source.readTo()` streaming into `target.writeFrom()`.
 ## Status
 
 All four providers are written against the Zowe v8 API and have been run
-against a real LPAR through z/OSMF. Still missing:
+against a real LPAR through z/OSMF.
+
+Done:
 
 - [x] Run against a real LPAR
 - [x] Streaming for large transfers
 - [x] Recursive copying of directories, PDSes and jobs
-- [ ] Moving folders (F5 copies them; a move of a folder is refused)
 - [x] `Alt+F7` search, by name and by text, in all four worlds
-- [ ] TSO and console commands on the command line
-- [ ] Recall of migrated data sets (shown, and the `HRECALL` named, but not issued)
+- [x] Recall of migrated data sets, from Enter, F3, F4 or `recall` on the command line
 - [x] Unit tests for the parts that can lose data quietly — the EBCDIC
       tables, LRECL fitting, transfer-mode choice and error parsing
-- [ ] Tests for the providers, which need a host to talk to
+- [x] Tests for the providers against a host (`npm run test:host`): MVS,
+      USS and JES, run against IBM Z Xplore
+
+Before 1.0:
+
+- [ ] Recall tried against a host with DFSMShsm: Z Xplore has none for users,
+      so it is only tested against a fake z/OSMF
+
+Later, around 1.2:
+
+- [ ] TSO and console commands on the command line. z/OSMF's TSO service
+      starts an address space of its own, which may collide with the file
+      services over the user's ISPF profile the way two file requests did
+      (`ISPT036`), so this needs trying against a host before it is designed.
+- [ ] Moving folders (F5 copies them; a move of a folder is refused)
 
 ## License
 

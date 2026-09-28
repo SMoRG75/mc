@@ -1,6 +1,7 @@
 import { pipeline, type Readable, type Writable } from 'node:stream';
+import { setTimeout as sleep } from 'node:timers/promises';
 import {
-  Create, CreateDataSetTypeEnum, Delete, Download, Get, List, Rename, Upload,
+  Create, CreateDataSetTypeEnum, Delete, Download, Get, HRecall, List, Rename, Upload,
 } from '@zowe/zos-files-for-zowe-sdk';
 import type { ICreateDataSetOptions, IZosFilesResponse } from '@zowe/zos-files-for-zowe-sdk';
 import type { AbstractSession } from '@zowe/imperative';
@@ -20,7 +21,14 @@ export interface DsSettings {
   binaryExtensions: () => readonly string[];
   /** Overrides the derived `<USER>.*` filter when the pane path is empty. */
   defaultFilter: () => string;
+  /**
+   * How often a recall is checked on, and how long before it is given up on.
+   * Left out, every 5 seconds for up to 15 minutes; tests make it quicker.
+   */
+  recall?: { pollMs: number; patienceMs: number };
 }
+
+const RECALL_DEFAULTS = { pollMs: 5_000, patienceMs: 15 * 60_000 };
 
 /** A pane on MVS datasets: a filter listing at the top level, members inside a PDS. */
 type DsRef =
@@ -111,7 +119,7 @@ export class DsProvider implements PaneProvider {
     const items = (response.apiResponse?.items ?? []) as ZosmfDataSet[];
 
     const entries: Entry<DsRef>[] = items.slice(0, limit).map((item) => {
-      const migrated = item.migr === 'YES' || item.vol === 'MIGRAT';
+      const migrated = isMigrated(item);
       return {
         ref: {
           kind: 'dataset', dsname: item.dsname, dsorg: item.dsorg,
@@ -243,10 +251,11 @@ export class DsProvider implements PaneProvider {
     const ref = entry.ref as DsRef;
     if (ref.kind === 'member') return undefined;
     if (ref.migrated) {
+      // The pane asks about a recall before it gets here; this is what a copy
+      // or anything else that walks into it sees.
       throw new UserFacingError(
-        `${ref.dsname} is migrated (HSM).`,
-        `The dataset has to be recalled before it can be read: HRECALL '${ref.dsname}' in TSO, `
-        + `or \`zowe zos-files recall data-set "${ref.dsname}"\` in a terminal. Press F2 once it is back.`,
+        `${ref.dsname} is migrated (HSM) — recall it first.`,
+        'Enter on it in the pane offers to, and so does `recall` on the command line.',
       );
     }
     return isPartitioned(ref.dsorg) ? { ...loc, path: ref.dsname } : undefined;
@@ -472,6 +481,37 @@ export class DsProvider implements PaneProvider {
     return dsname;
   }
 
+  /**
+   * Asks DFSMShsm for the data set back, then checks until it is.
+   *
+   * The request is queued at HSM rather than waited on at z/OSMF: a recall
+   * from tape can take many minutes, and a waiting request would hold the
+   * user's file-service queue — every listing behind it — for all of that.
+   * The checks are single-name listings, short enough to slip in between.
+   */
+  async recall(loc: PaneLocation, entry: Entry, signal: AbortSignal): Promise<void> {
+    const ref = entry.ref as DsRef;
+    if (ref.kind !== 'dataset') return;
+    const { pollMs, patienceMs } = this.settings.recall ?? RECALL_DEFAULTS;
+    const session = await this.sessions.session(loc.profile);
+    await this.sessions.fileService(session, () => HRecall.dataSet(session, ref.dsname, { wait: false }), signal);
+
+    const deadline = Date.now() + patienceMs;
+    for (;;) {
+      await sleep(pollMs, undefined, { signal });
+      const now = await this.attributes(session, ref.dsname).catch(() => undefined);
+      // Gone altogether is not "back", but it is not worth waiting on either.
+      if (now && !isMigrated(now)) return;
+      if (Date.now() >= deadline) {
+        throw new UserFacingError(
+          `${ref.dsname} is still migrated after ${Math.round(patienceMs / 60_000)} minutes.`,
+          'DFSMShsm has the request, and may yet carry it out — a recall from tape waits for '
+          + `a drive. HQUERY in TSO shows where it stands; F2 shows the data set once it is back.`,
+        );
+      }
+    }
+  }
+
   async submit(loc: PaneLocation, entries: Entry[]): Promise<string[]> {
     // Imported lazily: the jobs SDK is only needed when someone actually submits.
     const { SubmitJobs } = await import('@zowe/zos-jobs-for-zowe-sdk');
@@ -650,6 +690,11 @@ function datasetName(raw: string, prefix: string): string {
     );
   }
   return name;
+}
+
+/** What z/OSMF says about a data set DFSMShsm has moved off. */
+function isMigrated(item: ZosmfDataSet): boolean {
+  return item.migr === 'YES' || item.vol === 'MIGRAT';
 }
 
 /** A path with a wildcard (or empty) is a filter; anything else names one dataset. */

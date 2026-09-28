@@ -99,6 +99,12 @@ class Planner {
       this.leaveOut(entry.dto.name, 'it would be copied onto itself.');
       return;
     }
+    if (source.describe(sourceLoc, entry).offline) {
+      // One recall per file of a folder full of them is not something to
+      // start on the way past; the user can ask for the ones they want.
+      this.leaveOut(entry.dto.name, 'it is migrated — recall it first: Enter on it offers to.');
+      return;
+    }
     if (!this.claim(entry, targetLoc, name)) return;
 
     // Nothing needs asking about in a folder this copy has just made.

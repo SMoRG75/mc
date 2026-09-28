@@ -79,6 +79,8 @@ export class CommanderPanel {
   private jesTimer?: NodeJS.Timeout;
   /** The last state written, so a JES pane refreshing itself does not rewrite it. */
   private remembered = '';
+  /** Recalls being waited on, so closing the panel stops the waiting. */
+  private readonly recalls = new Set<AbortController>();
   /** Searches running, by the id the webview gave them, so they can be stopped. */
   private readonly searches = new Map<string, AbortController>();
   /** Pending re-listings, so a copy of 500 files does not list the pane 500 times. */
@@ -200,6 +202,7 @@ export class CommanderPanel {
     if (this.jesTimer) clearInterval(this.jesTimer);
     for (const timer of Object.values(this.refreshTimers)) clearTimeout(timer);
     for (const running of this.searches.values()) running.abort();
+    for (const waiting of this.recalls) waiting.abort();
     this.queue.cancelAll();
     for (const d of this.disposables) d.dispose();
   }
@@ -257,22 +260,9 @@ export class CommanderPanel {
           break;
         }
 
-        case 'enter': {
-          const state = this.panes[msg.pane];
-          const entry = this.entry(msg.pane, msg.entryId);
-          const next = this.provider(msg.pane).enter(state.location, entry);
-          if (next) {
-            // The row being entered is where the cursor belongs when the user
-            // comes back up, and it is known here and now — the webview's own
-            // report is on a timer this navigation is about to invalidate.
-            this.rememberCursorAt(msg.pane, state.location, msg.entryId);
-            this.goTo(msg.pane, next);
-            await this.refresh(msg.pane);
-          } else {
-            await this.openInEditor(msg.pane, msg.entryId, 'edit');
-          }
+        case 'enter':
+          await this.enter(msg.pane, msg.entryId);
           break;
-        }
 
         case 'refresh':
           await this.refresh(msg.pane);
@@ -500,9 +490,102 @@ export class CommanderPanel {
     };
   }
 
+  /** Into a folder, library or job; a file opens in the editor instead. */
+  private async enter(pane: PaneId, entryId: string): Promise<void> {
+    const state = this.panes[pane];
+    const entry = this.entry(pane, entryId);
+    if (await this.offerRecall(pane, entry, 'enter')) return;
+    const next = this.provider(pane).enter(state.location, entry);
+    if (next) {
+      // The row being entered is where the cursor belongs when the user
+      // comes back up, and it is known here and now — the webview's own
+      // report is on a timer this navigation is about to invalidate.
+      this.rememberCursorAt(pane, state.location, entryId);
+      this.goTo(pane, next);
+      await this.refresh(pane);
+    } else {
+      await this.openInEditor(pane, entryId, 'edit');
+    }
+  }
+
+  /**
+   * Enter, F3 and F4 on a migrated data set: ask whether to recall it, and if
+   * so start it and return true. False for anything that is at hand.
+   */
+  private async offerRecall(pane: PaneId, entry: Entry, then: 'enter' | OpenMode): Promise<boolean> {
+    const provider = this.provider(pane);
+    const location = this.panes[pane].location;
+    const item = provider.describe(location, entry);
+    if (!item.offline) return false;
+    if (!provider.recall) throw new UserFacingError(`${item.name} is ${item.offline} and cannot be read.`);
+    const answer = await vscode.window.showInformationMessage(
+      `${item.name} is migrated. Recall it?`,
+      {
+        modal: true,
+        detail: 'DFSMShsm has moved it off disk, and it has to come back before it can be read. '
+          + 'From disk that takes seconds, from tape it can take many minutes — you can carry on '
+          + 'meanwhile, and it opens once it is back if the pane is still here.',
+      },
+      'Recall',
+    );
+    if (answer === 'Recall') this.recallInBackground(pane, entry, then);
+    return true;
+  }
+
+  /**
+   * Waits for a recall with a notification that can be dismissed, then shows
+   * the data set: refreshes the panes standing where it is, and does what was
+   * asked of it — provided the pane is still there, since jumping somewhere
+   * minutes later would be the wrong kind of surprise.
+   */
+  private recallInBackground(pane: PaneId, entry: Entry, then?: 'enter' | OpenMode): void {
+    const provider = this.provider(pane);
+    const location = this.panes[pane].location;
+    const name = provider.describe(location, entry).name;
+    const stop = new AbortController();
+    this.recalls.add(stop);
+    log.info(`Recall requested: ${name}`);
+
+    const waited = vscode.window.withProgress({
+      location: vscode.ProgressLocation.Notification,
+      title: `Recalling ${name}…`,
+      cancellable: true,
+    }, async (_progress, token) => {
+      token.onCancellationRequested(() => stop.abort());
+      await provider.recall!(location, entry, stop.signal);
+    });
+
+    void Promise.resolve(waited).then(async () => {
+      log.info(`Recalled: ${name}`);
+      if (CommanderPanel.current !== this) return;
+      const here = (['left', 'right'] as PaneId[]).filter((p) => sameLocation(this.panes[p].location, location));
+      await Promise.all(here.map((p) => this.refresh(p)));
+      if (then && here.includes(pane)) {
+        if (then === 'enter') await this.enter(pane, entry.dto.id);
+        else await this.openInEditor(pane, entry.dto.id, then);
+      } else {
+        void vscode.window.showInformationMessage(`${name} has been recalled.`);
+      }
+    }).catch((err: unknown) => {
+      if (stop.signal.aborted) {
+        log.info(`Stopped waiting for the recall of ${name}`);
+        if (CommanderPanel.current === this) {
+          void vscode.window.showInformationMessage(
+            `Stopped waiting for ${name}. DFSMShsm still has the request; F2 shows it once it is back.`,
+          );
+        }
+        return;
+      }
+      if (CommanderPanel.current !== this) return;
+      const { message, detail } = describeError(err);
+      this.post({ type: 'error', pane, message, detail });
+    }).finally(() => this.recalls.delete(stop));
+  }
+
   private async openInEditor(pane: PaneId, entryId: string, mode: OpenMode): Promise<void> {
     const state = this.panes[pane];
     const entry = this.entry(pane, entryId);
+    if (await this.offerRecall(pane, entry, mode)) return;
 
     // Shift+F3 has to go through the bridge even on local disk: the point of it
     // is that nothing but the bridge is allowed to interpret the bytes.
@@ -701,6 +784,12 @@ export class CommanderPanel {
         `'${entry.dto.name}' is a folder — F10 compares two files.`,
       );
     }
+    if (provider.describe(location, entry).offline) {
+      throw new UserFacingError(
+        `'${entry.dto.name}' is migrated — recall it first.`,
+        'Enter on it offers to, and so does `recall` on the command line.',
+      );
+    }
     const name = provider.describe(location, entry).name;
     return {
       uri: location.kind === 'local'
@@ -740,8 +829,22 @@ export class CommanderPanel {
       case 'refresh':
         await this.refresh(pane);
         return;
+      case 'recall':
+      case 'hrecall': {
+        // TSO's name for it works too, since that is what the fingers know.
+        const entry = this.panes[pane].entries.find(
+          (e) => e.dto.name.toUpperCase() === argument.replace(/'/g, '').toUpperCase(),
+        );
+        if (!entry) throw new Error(`'${argument}' is not in the pane.`);
+        const provider = this.provider(pane);
+        if (!provider.describe(this.panes[pane].location, entry).offline) {
+          throw new UserFacingError(`${entry.dto.name} is not migrated.`);
+        }
+        this.recallInBackground(pane, entry);
+        return;
+      }
       default:
-        throw new Error(`Unknown command '${verb}'. Known commands: cd, submit, refresh.`);
+        throw new Error(`Unknown command '${verb}'. Known commands: cd, submit, recall, refresh.`);
     }
   }
 

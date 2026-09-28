@@ -214,6 +214,13 @@ export interface PaneProvider {
    */
   create(loc: PaneLocation, name: string, dataset?: DatasetSpec): Promise<string>;
 
+  /**
+   * Brings back an entry whose `describe().offline` says it is not at hand —
+   * a migrated data set — and resolves once it is. That can be seconds or, from
+   * tape, many minutes; `signal` stops the waiting, not the recall itself.
+   */
+  recall?(loc: PaneLocation, entry: Entry, signal: AbortSignal): Promise<void>;
+
   /** F9, only where `capabilities().submit` is true. */
   submit?(loc: PaneLocation, entries: Entry[]): Promise<string[]>;
 }
