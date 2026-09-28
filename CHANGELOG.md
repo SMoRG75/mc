@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.1 — 2026-09-28
+
+- `F7` without the dialog — the command line — allocates in tracks, as the
+  dialog does. Left without a unit, the SDK asked for cylinders, which some
+  installations' SMS refuses outright: on IBM Z Xplore even one cylinder is
+  turned down, while the same data set in tracks goes through.
+- Copying a PDS that was allocated in cylinders to a system that refuses them
+  allocates the same space in tracks instead, and says so in the log.
+- Cylinders chosen in the F7 dialog are left as chosen, but when SMS refuses
+  them the message says so and suggests tracks, instead of SMS's own advice
+  about storage classes nobody gave.
+
 ## 0.13.0 — 2026-09-28
 
 - Migrated data sets can be recalled from the pane. Enter, F3 or F4 on one

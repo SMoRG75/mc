@@ -412,9 +412,39 @@ export class DsProvider implements PaneProvider {
       // rest is room for the members the PDS will get after this copy.
       spec.dirblk = Math.max(spec.dirblk ?? 0, 20, Math.ceil(shape.files / 5));
     }
-    await this.sessions.fileService(session, () =>
-      Create.dataSet(session, typeOf(spec), dsname, attributesOf(spec)));
+    try {
+      await this.allocate(session, dsname, spec);
+    } catch (err) {
+      // The unit came from the original, not from the user: on a system that
+      // only takes tracks, the same space in tracks is what they would want.
+      if (!(refusedByAcs(err) && spec.alcunit === 'CYL')) throw err;
+      log.warn(`${dsname}: SMS refused an allocation in cylinders; trying the same space in tracks.`);
+      await this.allocate(session, dsname, inTracks(spec));
+    }
     return { location, created: true };
+  }
+
+  /**
+   * Allocates `dsname`, and turns SMS refusing it into something to act on:
+   * its own message asks about storage classes, which nobody may have given.
+   */
+  private async allocate(session: AbstractSession, dsname: string, spec: DatasetSpec | undefined): Promise<void> {
+    try {
+      await this.sessions.fileService(session, () =>
+        Create.dataSet(session, typeOf(spec), dsname, attributesOf(spec)));
+    } catch (err) {
+      if (!refusedByAcs(err)) throw err;
+      const { message } = describeError(err);
+      throw Object.assign(new UserFacingError(
+        `SMS refused to allocate ${dsname}.`,
+        (spec?.alcunit === 'CYL'
+          ? 'The space was asked for in cylinders, and some systems only allow tracks — IBM Z '
+            + 'Xplore refuses even one cylinder. Choose Tracks in the dialog. '
+          : 'The installation\'s ACS routines turned the allocation down. ')
+        + 'Allocating with LIKE an existing data set of yours takes its storage, data and '
+        + `management classes, which the routines have already accepted once.\n\n${message}`,
+      ), { cause: err });
+    }
   }
 
   /** Inside a PDS, a name is the member it becomes. */
@@ -476,8 +506,7 @@ export class DsProvider implements PaneProvider {
         Create.dataSetLike(session, dsname, model, classesOf(spec)));
       return dsname;
     }
-    await this.sessions.fileService(session, () =>
-      Create.dataSet(session, typeOf(spec), dsname, attributesOf(spec)));
+    await this.allocate(session, dsname, spec);
     return dsname;
   }
 
@@ -616,8 +645,11 @@ function typeOf(spec: DatasetSpec | undefined): CreateDataSetTypeEnum {
  */
 function attributesOf(spec: DatasetSpec | undefined): Partial<ICreateDataSetOptions> {
   if (!spec) {
+    // The dialog's defaults, unit and all. Left without one, the SDK allocates
+    // in cylinders — which some systems' ACS routines refuse outright (Z Xplore
+    // does, even one cylinder), while the dialog's tracks go through.
     return {
-      primary: 10, secondary: 5, recfm: 'FB', lrecl: 80, blksize: 27920, dsntype: 'LIBRARY',
+      alcunit: 'TRK', primary: 10, secondary: 5, recfm: 'FB', lrecl: 80, blksize: 27920, dsntype: 'LIBRARY',
     };
   }
   const recfm = spec.recfm.trim().toUpperCase() || 'FB';
@@ -690,6 +722,17 @@ function datasetName(raw: string, prefix: string): string {
     );
   }
   return name;
+}
+
+/** SMS turning an allocation down in its ACS routines — or anything wrapping that. */
+function refusedByAcs(err: unknown): boolean {
+  const { message, detail } = describeError((err as { cause?: unknown })?.cause ?? err);
+  return /SMS or ACS services returned an error/i.test(`${message}\n${detail ?? ''}`);
+}
+
+/** The same space in tracks: a 3390 cylinder is 15 of them. */
+function inTracks(spec: DatasetSpec): DatasetSpec {
+  return { ...spec, alcunit: 'TRK', primary: spec.primary * 15, secondary: spec.secondary * 15 };
 }
 
 /** What z/OSMF says about a data set DFSMShsm has moved off. */

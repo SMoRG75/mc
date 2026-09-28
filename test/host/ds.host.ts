@@ -146,14 +146,16 @@ test('listings at once no longer collide over the ISPF profile', async () => {
 test('Alt+F7 finds text in a member, with the line it is on', async () => {
   await ds.write(inside, 'MCTFIND', Buffer.from('hay\nthe NEEDLE is here\nhay\n'), options(), signal());
   const hits: SearchHitDto[] = [];
-  await search({
+  const outcome = await search({
     provider: ds, root: inside, options: options({ mode: 'auto' }), binaryExtensions: [],
     concurrency: 3, signal: signal(),
     query: { names: `${PREFIX}*`, text: 'needle', caseSensitive: false, subfolders: false },
     onHit: (hit) => hits.push(hit), onProgress: () => undefined,
   });
   const hit = hits.find((h) => h.name === 'MCTFIND');
-  assert.ok(hit, 'found');
+  // What the search could not look at says why it missed, when it does.
+  assert.ok(hit, `not found; the search noted:\n${outcome.notes.join('\n')}`);
+  assert.deepEqual(outcome.notes, [], 'every member was read');
   assert.equal(hit.line, 2);
 });
 
