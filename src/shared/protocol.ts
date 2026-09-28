@@ -185,6 +185,35 @@ export interface ProfileDto {
   isDefault: boolean;
 }
 
+/** Alt+F7: what to look for, below where the pane is standing. */
+export interface SearchQuery {
+  /**
+   * Name patterns with `*` and `?`, several separated by `;` — `*.jcl;*.cbl`.
+   * Matched without regard to case, since MVS names have none. Empty matches
+   * every name.
+   */
+  names: string;
+  /** Text to find inside the files. Empty searches by name alone. */
+  text: string;
+  /** Whether `text` has to match in case as well. */
+  caseSensitive: boolean;
+  /** Down into folders, libraries and jobs, or only where the pane is. */
+  subfolders: boolean;
+}
+
+export interface SearchHitDto {
+  /** The folder it is in, which is where the pane goes to show it. */
+  location: PaneLocation;
+  entryId: string;
+  name: string;
+  kind: EntryKind;
+  /** The folder, as a path from where the search started; empty at the top. */
+  where: string;
+  /** The first line the text was found on, when the search was for text. */
+  line?: number;
+  text?: string;
+}
+
 /* ------------------------------------------------------------------ */
 /* extension host -> webview                                           */
 /* ------------------------------------------------------------------ */
@@ -219,7 +248,21 @@ export type HostMessage =
    * but nothing inside it, so the webview has to put the caret somewhere itself
    * or the first keypress goes nowhere and the user has to click.
    */
-  | { type: 'focus' };
+  | { type: 'focus' }
+  /**
+   * A search under way: the hits since the last one, and how far it has got.
+   * `done` comes once, last, with what it had to leave out.
+   */
+  | {
+    type: 'search';
+    id: string;
+    hits: SearchHitDto[];
+    folders: number;
+    files: number;
+    /** Where it is looking now. */
+    current?: string;
+    done?: { stopped: boolean; notes: string[] };
+  };
 
 /* ------------------------------------------------------------------ */
 /* webview -> extension host                                           */
@@ -265,7 +308,12 @@ export type ClientMessage =
   | { type: 'setFilter'; pane: PaneId; values: Record<string, string> }
   /** Saving over an existing name replaces it — the name is the identity. */
   | { type: 'saveFavourite'; name: string; location: PaneLocation }
-  | { type: 'removeFavourite'; name: string };
+  | { type: 'removeFavourite'; name: string }
+  /** Alt+F7, below where `pane` is standing. `id` names it in the answers. */
+  | { type: 'search'; pane: PaneId; id: string; query: SearchQuery }
+  | { type: 'stopSearch'; id: string }
+  /** Show `entryId` in `pane`: go to where it is, with the cursor on it. */
+  | { type: 'reveal'; pane: PaneId; location: PaneLocation; entryId: string };
 
 /**
  * Whether a message is work the user is waiting for, and so should be shown as
@@ -273,11 +321,14 @@ export type ClientMessage =
  * state the moment it sends, the host to say when to take it back again. They
  * have to agree, or a pointer set on the way out is never cleared.
  *
- * Only the debounced cursor report is not: it is bookkeeping the user never
- * asked for and cannot tell has happened.
+ * Not the debounced cursor report, which is bookkeeping the user never asked
+ * for and cannot tell has happened, and not a search, which has a dialog of
+ * its own to say how it is getting on.
  */
 export function reportsProgress(type: ClientMessage['type']): boolean {
-  return type !== 'cursor';
+  // A search reports its own progress in its dialog, for as long as it runs;
+  // the pointer would say the whole panel is busy the whole time.
+  return type !== 'cursor' && type !== 'search' && type !== 'stopSearch';
 }
 
 /** Two locations are the same place when they agree on world, profile and path. */

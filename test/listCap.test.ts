@@ -27,7 +27,11 @@ async function zosmf(size: number) {
     hostname: '127.0.0.1', port: (server.address() as AddressInfo).port,
     protocol: 'http', type: 'basic', user: 'u', password: 'p', rejectUnauthorized: false,
   });
-  const uss = new UssProvider({ session: async () => session } as unknown as SessionManager, {
+  const sessions = {
+    session: async () => session,
+    fileService: <T>(_session: unknown, call: () => Promise<T>) => call(),
+  };
+  const uss = new UssProvider(sessions as unknown as SessionManager, {
     pageSize: () => 10, binaryExtensions: () => [],
   });
   return { uss, asked, close: () => server.close() };

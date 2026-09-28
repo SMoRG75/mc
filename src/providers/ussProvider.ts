@@ -44,7 +44,8 @@ export class UssProvider implements PaneProvider {
     // like /z with every user's home in it does not come back at all when
     // asked for in full. Two more for '.' and '..', one more to see whether
     // there was more than the pane shows.
-    const response = await List.fileList(session, dir, capped(limit, 3));
+    const response = await this.sessions.fileService(session, () =>
+      List.fileList(session, dir, capped(limit, 3)), signal);
     signal.throwIfAborted();
 
     // z/OSMF returns '.' and '..'; the pane draws its own '..' row.
@@ -142,7 +143,8 @@ export class UssProvider implements PaneProvider {
       return { binary: true };
     }
     const options: { binary?: boolean; encoding?: string } = { encoding: transfer.codepage };
-    await Utilities.applyTaggedEncoding(session, path, options).catch(() => undefined);
+    await this.sessions.fileService(session, () =>
+      Utilities.applyTaggedEncoding(session, path, options)).catch(() => undefined);
     if (options.binary) delete options.encoding;
     return options;
   }
@@ -168,7 +170,7 @@ export class UssProvider implements PaneProvider {
 
   async exists(loc: PaneLocation, name: string): Promise<boolean> {
     const session = await this.sessions.session(loc.profile);
-    const response = await List.fileList(session, loc.path, {});
+    const response = await this.sessions.fileService(session, () => List.fileList(session, loc.path, {}));
     const items = (response.apiResponse?.items ?? []) as ZosmfUssItem[];
     return items.some((item) => item.name === name);
   }
@@ -177,32 +179,35 @@ export class UssProvider implements PaneProvider {
     const session = await this.sessions.session(loc.profile);
     for (const entry of entries) {
       const ref = entry.ref as UssRef;
-      await Delete.ussFile(session, ref.path, ref.isDirectory);
+      await this.sessions.fileService(session, () => Delete.ussFile(session, ref.path, ref.isDirectory));
     }
   }
 
   async rename(loc: PaneLocation, entry: Entry, newName: string): Promise<void> {
     const session = await this.sessions.session(loc.profile);
     const ref = entry.ref as UssRef;
-    await Utilities.renameUSSFile(session, ref.path, join(dirname(ref.path), newName));
+    await this.sessions.fileService(session, () =>
+      Utilities.renameUSSFile(session, ref.path, join(dirname(ref.path), newName)));
   }
 
   async folder(loc: PaneLocation, name: string): Promise<{ location: PaneLocation; created: boolean }> {
     const session = await this.sessions.session(loc.profile);
     const location = { ...loc, path: join(loc.path || '/', name) };
-    const response = await List.fileList(session, loc.path || '/', {});
+    const response = await this.sessions.fileService(session, () =>
+      List.fileList(session, loc.path || '/', {}));
     const there = ((response.apiResponse?.items ?? []) as ZosmfUssItem[]).find((item) => item.name === name);
     if (there && !there.mode?.startsWith('d')) {
       throw new UserFacingError(`'${location.path}' exists, and it is a file, not a directory.`);
     }
-    if (!there) await Create.uss(session, location.path, 'directory');
+    if (!there) await this.sessions.fileService(session, () =>
+      Create.uss(session, location.path, 'directory'));
     return { location, created: !there };
   }
 
   /** F7 makes a directory; a trailing name without '/' still means a directory here. */
   async create(loc: PaneLocation, name: string): Promise<string> {
     const session = await this.sessions.session(loc.profile);
-    await Create.uss(session, join(loc.path, name), 'directory');
+    await this.sessions.fileService(session, () => Create.uss(session, join(loc.path, name), 'directory'));
     return name;
   }
 

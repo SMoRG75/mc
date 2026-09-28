@@ -106,7 +106,7 @@ export class DsProvider implements PaneProvider {
   private async listDataSets(
     session: AbstractSession, filter: string, limit: number, signal: AbortSignal,
   ): Promise<Listing> {
-    const { response, withAttributes } = await this.listWithAttributeFallback(session, filter, limit);
+    const { response, withAttributes } = await this.listWithAttributeFallback(session, filter, limit, signal);
     signal.throwIfAborted();
     const items = (response.apiResponse?.items ?? []) as ZosmfDataSet[];
 
@@ -161,20 +161,26 @@ export class DsProvider implements PaneProvider {
    * re-thrown only if the plain listing fails too, since that one is real.
    */
   private async listWithAttributeFallback(
-    session: AbstractSession, filter: string, limit: number,
+    session: AbstractSession, filter: string, limit: number, signal: AbortSignal,
   ): Promise<{ response: IZosFilesResponse; withAttributes: boolean }> {
     // No more than the pane shows, and one to tell whether there was more:
     // z/OSMF builds the list in TSO and gives up on it after 30 seconds.
     const cap = capped(limit);
     try {
-      return { response: await List.dataSet(session, filter, { attributes: true, ...cap }), withAttributes: true };
+      const response = await this.sessions.fileService(session, () =>
+        List.dataSet(session, filter, { attributes: true, ...cap }), signal);
+      return { response, withAttributes: true };
     } catch (rich) {
+      // Skipped in the queue because the pane moved on: nothing failed.
+      if (signal.aborted) throw rich;
       // Worth keeping even when the fallback works: the TSO services failing
       // here are the ones everything else then trips over.
       const { message, detail } = describeError(rich);
       log.warn(`Listing '${filter}' with attributes failed; listing it without them: ${message}`, detail);
       try {
-        return { response: await List.dataSet(session, filter, cap), withAttributes: false };
+        const response = await this.sessions.fileService(session, () =>
+          List.dataSet(session, filter, cap), signal);
+        return { response, withAttributes: false };
       } catch {
         throw explainListFailure(rich, filter);
       }
@@ -185,7 +191,8 @@ export class DsProvider implements PaneProvider {
     session: AbstractSession, dsname: string, limit: number, signal: AbortSignal,
   ): Promise<Listing> {
     const [members, attributes] = await Promise.all([
-      List.allMembers(session, dsname, { attributes: true, ...capped(limit) }),
+      this.sessions.fileService(session, () =>
+        List.allMembers(session, dsname, { attributes: true, ...capped(limit) }), signal),
       this.attributes(session, dsname).catch(() => undefined),
     ]);
     signal.throwIfAborted();
@@ -252,7 +259,12 @@ export class DsProvider implements PaneProvider {
     // length — says nothing about how many bytes a transfer will move.
     return ref.kind === 'member'
       ? { name: ref.member, text: true }
-      : { name: ref.dsname, text: true, dataset: isPartitioned(ref.dsorg) ? shapeOf(ref) : undefined };
+      : {
+        name: ref.dsname,
+        text: true,
+        dataset: isPartitioned(ref.dsorg) ? shapeOf(ref) : undefined,
+        offline: ref.migrated ? 'migrated' : undefined,
+      };
   }
 
   recordLength(_loc: PaneLocation, entry: Entry): number | undefined {
@@ -391,7 +403,8 @@ export class DsProvider implements PaneProvider {
       // rest is room for the members the PDS will get after this copy.
       spec.dirblk = Math.max(spec.dirblk ?? 0, 20, Math.ceil(shape.files / 5));
     }
-    await Create.dataSet(session, typeOf(spec), dsname, attributesOf(spec));
+    await this.sessions.fileService(session, () =>
+      Create.dataSet(session, typeOf(spec), dsname, attributesOf(spec)));
     return { location, created: true };
   }
 
@@ -403,17 +416,18 @@ export class DsProvider implements PaneProvider {
   async exists(loc: PaneLocation, name: string): Promise<boolean> {
     const session = await this.sessions.session(loc.profile);
     if (isFilter(loc.path)) {
-      const response = await List.dataSet(session, name, {});
+      const response = await this.sessions.fileService(session, () => List.dataSet(session, name, {}));
       return ((response.apiResponse?.items ?? []) as ZosmfDataSet[]).length > 0;
     }
-    const response = await List.allMembers(session, loc.path, { pattern: memberName(name) });
+    const response = await this.sessions.fileService(session, () =>
+      List.allMembers(session, loc.path, { pattern: memberName(name) }));
     return ((response.apiResponse?.items ?? []) as ZosmfMember[]).length > 0;
   }
 
   async remove(loc: PaneLocation, entries: Entry[]): Promise<void> {
     const session = await this.sessions.session(loc.profile);
     for (const entry of entries) {
-      await Delete.dataSet(session, qualify(entry.ref as DsRef));
+      await this.sessions.fileService(session, () => Delete.dataSet(session, qualify(entry.ref as DsRef)));
     }
   }
 
@@ -422,9 +436,11 @@ export class DsProvider implements PaneProvider {
     const session = await this.sessions.session(loc.profile);
     const ref = entry.ref as DsRef;
     if (ref.kind === 'member') {
-      await Rename.dataSetMember(session, ref.dsname, ref.member, memberName(newName));
+      await this.sessions.fileService(session, () =>
+        Rename.dataSetMember(session, ref.dsname, ref.member, memberName(newName)));
     } else {
-      await Rename.dataSet(session, ref.dsname, datasetName(newName, userPrefix(session)));
+      await this.sessions.fileService(session, () =>
+        Rename.dataSet(session, ref.dsname, datasetName(newName, userPrefix(session))));
     }
   }
 
@@ -446,10 +462,13 @@ export class DsProvider implements PaneProvider {
     if (spec?.like) {
       // z/OSMF copies every attribute from the model, so sending our own on top
       // would only overwrite what the user asked to inherit.
-      await Create.dataSetLike(session, dsname, datasetName(spec.like, prefix), classesOf(spec));
+      const model = datasetName(spec.like, prefix);
+      await this.sessions.fileService(session, () =>
+        Create.dataSetLike(session, dsname, model, classesOf(spec)));
       return dsname;
     }
-    await Create.dataSet(session, typeOf(spec), dsname, attributesOf(spec));
+    await this.sessions.fileService(session, () =>
+      Create.dataSet(session, typeOf(spec), dsname, attributesOf(spec)));
     return dsname;
   }
 
@@ -466,7 +485,8 @@ export class DsProvider implements PaneProvider {
   }
 
   private async attributes(session: AbstractSession, dsname: string): Promise<ZosmfDataSet | undefined> {
-    const response = await List.dataSet(session, dsname, { attributes: true });
+    const response = await this.sessions.fileService(session, () =>
+      List.dataSet(session, dsname, { attributes: true }));
     return ((response.apiResponse?.items ?? []) as ZosmfDataSet[])[0];
   }
 }

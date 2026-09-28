@@ -13,7 +13,7 @@ export type Action =
   | 'view' | 'viewEbcdic' | 'edit' | 'copy' | 'copyNoDialog' | 'rename' | 'create'
   | 'delete' | 'submit' | 'compare' | 'refresh' | 'swapPanes' | 'focusCommandLine'
   | 'quickFilter' | 'cancel' | 'nextView' | 'sortNext' | 'sortReverse'
-  | 'editFilter' | 'favourites' | 'help'
+  | 'editFilter' | 'favourites' | 'help' | 'search'
   | 'kindLocal' | 'kindDs' | 'kindUss' | 'kindJes';
 
 const BINDINGS: Record<string, Action> = {
@@ -57,6 +57,8 @@ const BINDINGS: Record<string, Action> = {
   'Ctrl+f': 'editFilter',
   // Total Commander's directory hotlist, on the same key.
   'Ctrl+d': 'favourites',
+  // And its Find Files.
+  'Alt+F7': 'search',
   Escape: 'cancel',
   // The four tabs in the pane header, in the order they are drawn.
   'Alt+1': 'kindLocal',
@@ -123,6 +125,7 @@ export const SHORTCUTS: readonly {
   {
     title: 'Finding things',
     rows: [
+      ['Alt+F7', 'Find files below here by name, and by text inside them'],
       ['Ctrl+S', 'Quick filter: type to narrow, Enter keeps it, Esc clears it'],
       ['Ctrl+F', 'Change what the pane is a filter of — owner and job name on JES'],
       ['Ctrl+F3', 'Sort by the next column'],

@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.12.0 — 2026-09-28
+
+- `Alt+F7` finds files below where the pane is standing, in any of the four
+  worlds: by name, with `*` and `?` and several patterns at once
+  (`*.jcl;*.cbl`), and by text inside them — in what F3 would show, converted
+  from the codepage, so æøå is found in a member. It goes down through
+  folders, libraries and jobs, so a search from a data set filter looks in
+  every member, and one from JES in every spool file. Hits appear as they are
+  found, with the line the text is on; Enter shows the hit in the pane.
+- A file is read only as far as the first line with the text on it. Migrated
+  data sets are left unread, since reading one starts a recall, and so are the
+  binary names in `mc.transfer.binaryExtensions`; the dialog says how many.
+- Listings and the other z/OSMF file requests that are not transfers go one at
+  a time per user. With two at once z/OSMF starts a second TSO address space,
+  which finds the user's ISPF profile held by the first and stops at `ISPT036
+  Table in use` — "received TSO Prompt when expecting
+  TSO_SERVLET_DISPATCHER_READY". Opening the panel lists both panes at once,
+  which was enough. Reproduced with Zowe CLI alone on IBM's Z Xplore: four
+  listings at once failed 3 times in 12, one after another never. Reading and
+  writing content was measured not to collide, so transfers stay parallel.
+- When `ISPT036` does come — from another client using z/OSMF as the same user
+  at that moment — the message says what it is.
+- Opening the panel no longer builds two sessions for one profile.
+
 ## 0.11.1 — 2026-09-28
 
 - A pane asks z/OSMF for no more entries than it shows (`mc.list.pageSize`),

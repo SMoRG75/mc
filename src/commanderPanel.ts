@@ -3,11 +3,12 @@ import { randomBytes } from 'node:crypto';
 import {
   reportsProgress,
   type ClientMessage, type HostMessage, type PaneId, type PaneKind, type PaneLocation,
-  type TransferJobDto, type TransferOptions,
+  type SearchHitDto, type SearchQuery, type TransferJobDto, type TransferOptions,
 } from './shared/protocol';
 import type { Entry, PaneProvider, ProviderRegistry } from './core/provider';
 import { TransferQueue, type TransferRequest } from './core/transferQueue';
 import { planCopy, type ConflictAnswer } from './core/treeCopy';
+import { search } from './core/search';
 import { EditorBridge, type OpenMode } from './core/editorBridge';
 import { CursorHistory } from './core/cursorHistory';
 import { describeError, UserFacingError } from './core/errors';
@@ -28,6 +29,9 @@ const VIEW_TYPE = 'mainframeCommander';
  * which is a different kind of thing and belongs in a memento.
  */
 const REMEMBERED_PANES = 'panes.last';
+
+/** How often a running search sends what it has found to the dialog. */
+const SEARCH_REPORT_MS = 150;
 
 /** How often, at most, finished transfers make a pane list itself again. */
 const REFRESH_MS = 300;
@@ -75,6 +79,8 @@ export class CommanderPanel {
   private jesTimer?: NodeJS.Timeout;
   /** The last state written, so a JES pane refreshing itself does not rewrite it. */
   private remembered = '';
+  /** Searches running, by the id the webview gave them, so they can be stopped. */
+  private readonly searches = new Map<string, AbortController>();
   /** Pending re-listings, so a copy of 500 files does not list the pane 500 times. */
   private readonly refreshTimers: Partial<Record<PaneId, NodeJS.Timeout>> = {};
   /**
@@ -193,6 +199,7 @@ export class CommanderPanel {
     CommanderPanel.current = undefined;
     if (this.jesTimer) clearInterval(this.jesTimer);
     for (const timer of Object.values(this.refreshTimers)) clearTimeout(timer);
+    for (const running of this.searches.values()) running.abort();
     this.queue.cancelAll();
     for (const d of this.disposables) d.dispose();
   }
@@ -345,6 +352,26 @@ export class CommanderPanel {
             { name: msg.name, location: msg.location },
           ]);
           break;
+
+        case 'search':
+          // Not awaited: it runs for as long as it runs, and reports as it goes.
+          this.startSearch(msg.pane, msg.id, msg.query);
+          break;
+
+        case 'stopSearch':
+          this.searches.get(msg.id)?.abort();
+          break;
+
+        case 'reveal': {
+          this.goTo(msg.pane, msg.location);
+          // The row the search found, rather than the one the pane last had
+          // its cursor on here.
+          const state = this.panes[msg.pane];
+          state.restore = msg.entryId;
+          state.cursor = msg.entryId;
+          await this.refresh(msg.pane);
+          break;
+        }
 
         case 'removeFavourite':
           await settings.saveFavourites(
@@ -572,6 +599,52 @@ export class CommanderPanel {
       this.refreshTimers[pane] = undefined;
       void this.refresh(pane);
     }, REFRESH_MS);
+  }
+
+  /**
+   * Alt+F7 below where `pane` is standing. Hits and progress go to the dialog
+   * in batches a few times a second; the last message carries `done`.
+   */
+  private startSearch(pane: PaneId, id: string, query: SearchQuery): void {
+    const stop = new AbortController();
+    this.searches.set(id, stop);
+    const provider = this.provider(pane);
+    const root = this.panes[pane].location;
+    const started = performance.now();
+    log.info(`Search below ${root.kind}:${root.profile || '-'}:${root.path || '/'}`
+      + ` for names '${query.names || '*'}'${query.text ? ` containing '${query.text}'` : ''}`);
+
+    let hits: SearchHitDto[] = [];
+    let found = 0;
+    let progress = { folders: 0, files: 0, current: '' };
+    let timer: NodeJS.Timeout | undefined;
+    const flush = () => {
+      timer = undefined;
+      const batch = hits;
+      hits = [];
+      this.post({ type: 'search', id, hits: batch, ...progress });
+    };
+    const soon = () => { timer ??= setTimeout(flush, SEARCH_REPORT_MS); };
+
+    void search({
+      provider, root, query,
+      // Read as F3 reads, except that the binary list decides what is text:
+      // a search for words in a load module finds nothing worth showing.
+      options: { ...settings.transferDefaults(), mode: 'auto' },
+      binaryExtensions: settings.binaryExtensions(),
+      concurrency: settings.concurrency(),
+      signal: stop.signal,
+      onHit: (hit) => { hits.push(hit); found += 1; soon(); },
+      onProgress: (folders, files, current) => { progress = { folders, files, current }; soon(); },
+    }).catch((err: unknown) => ({ stopped: false, notes: [describeError(err).message] }))
+      .then((outcome) => {
+        clearTimeout(timer);
+        this.searches.delete(id);
+        this.post({ type: 'search', id, hits, folders: progress.folders, files: progress.files, done: outcome });
+        log.info(`Search ${outcome.stopped ? 'stopped' : 'finished'}: ${found} found in ${progress.folders} folders`
+          + ` and ${progress.files} files, ${Math.round(performance.now() - started)} ms`,
+        outcome.notes.join('\n') || undefined);
+      });
   }
 
   private async remove(pane: PaneId, entryIds: string[]): Promise<void> {

@@ -17,9 +17,14 @@ export function modalOpen(): boolean {
   return openCount > 0;
 }
 
-/** Builds a modal, resolves with its result, and always cleans itself up. */
-function modal<T>(
+/**
+ * Builds a modal, resolves with its result, and always cleans itself up.
+ * `onClose` runs however it closes — a button, Escape or a click outside — for
+ * a dialog with something of its own to stop.
+ */
+export function modal<T>(
   build: (resolve: (value: T | undefined) => void) => HTMLElement,
+  onClose?: () => void,
 ): Promise<T | undefined> {
   return new Promise((resolve) => {
     // Where the keyboard was, so closing the dialog gives it back to the pane
@@ -31,6 +36,7 @@ function modal<T>(
     const finish = (value: T | undefined) => {
       if (done) return;
       done = true;
+      onClose?.();
       openCount -= 1;
       backdrop.remove();
       box.remove();
@@ -508,7 +514,7 @@ function radios(name: string, options: [string, string][], selected: string): st
     ${escapeHtml(label)}</label>`).join('')}</span>`;
 }
 
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text.replace(/[&<>"]/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] ?? c
   ));

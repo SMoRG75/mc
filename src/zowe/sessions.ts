@@ -2,6 +2,7 @@ import { ProfileInfo, type AbstractSession, type IProfArgAttrs, type IProfAttrs 
 import type { ProfileDto } from '../shared/protocol';
 import { UserFacingError } from '../core/errors';
 import { log } from '../core/log';
+import { Serializer } from '../core/serial';
 
 /**
  * Owns the connection to z/OS.
@@ -14,7 +15,30 @@ import { log } from '../core/log';
  */
 export class SessionManager {
   private info?: Promise<ProfileInfo>;
-  private readonly sessions = new Map<string, AbstractSession>();
+  /**
+   * Promises, not sessions: both panes ask for one as the panel opens, and
+   * caching only the finished session let each of them build its own.
+   */
+  private readonly sessions = new Map<string, Promise<AbstractSession>>();
+  private readonly fileServices = new Serializer();
+
+  /**
+   * Runs `call` — one z/OSMF file-service request that is not a transfer:
+   * a listing, an attribute lookup, a create, rename or delete — once no other
+   * such request for the same user on the same host is running.
+   *
+   * Two at once make z/OSMF start a second TSO address space for the user,
+   * which cannot open the ISPF profile the first one holds and stops at
+   * `ISPT036 Table in use`; see `Serializer`. Reading and writing content was
+   * measured not to, so transfers stay parallel and do not go through here.
+   */
+  fileService<T>(session: AbstractSession, call: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    // By host and user rather than by profile: it is the user's ISPF profile
+    // that is held, and two profiles for one user share it.
+    const s = session.ISession;
+    const key = `${s.hostname}:${s.port}:${(s.user ?? '').toUpperCase()}`;
+    return this.fileServices.run(key, call, signal);
+  }
 
   /** Re-reads zowe.config.json; call when the user edits their profiles. */
   invalidate(): void {
@@ -48,10 +72,19 @@ export class SessionManager {
   }
 
   /** The session for a profile name; empty name means the default profile. */
-  async session(profileName: string): Promise<AbstractSession> {
+  session(profileName: string): Promise<AbstractSession> {
     const cached = this.sessions.get(profileName);
     if (cached) return cached;
+    const session = this.createSession(profileName);
+    this.sessions.set(profileName, session);
+    // A failure is not cached: the user fixes the profile and presses F2.
+    session.catch(() => {
+      if (this.sessions.get(profileName) === session) this.sessions.delete(profileName);
+    });
+    return session;
+  }
 
+  private async createSession(profileName: string): Promise<AbstractSession> {
     const info = await this.profileInfo();
     const attrs = profileName
       ? info.getAllProfiles('zosmf').find((p) => p.profName === profileName)
@@ -69,7 +102,6 @@ export class SessionManager {
     const merged = info.mergeArgsForProfile(attrs, { getSecureVals: true });
     assertHasCredentials(merged.knownArgs, attrs.profName);
     const session = ProfileInfo.createSession(merged.knownArgs);
-    this.sessions.set(profileName, session);
     const s = session.ISession;
     // Where, and as whom — never with what: the password and token stay out.
     log.info(`Profile '${attrs.profName}': ${s.protocol ?? 'https'}://${s.hostname}:${s.port}`

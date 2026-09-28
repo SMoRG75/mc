@@ -1,6 +1,6 @@
 import type {
   EntryDto, FavouriteDto, HostMessage, PaneId, PaneLocation, ProfileDto,
-  TransferJobDto, TransferOptions,
+  SearchQuery, TransferJobDto, TransferOptions,
 } from '../src/shared/protocol';
 import { Pane } from './pane';
 import { Dispatcher, type Action } from './keymap';
@@ -8,6 +8,7 @@ import {
   datasetDialog, favouritesDialog, filterDialog, helpDialog, modalOpen, prompt, transferDialog,
 } from './dialogs';
 import { setHostWorking, setTransfersRunning } from './progress';
+import { searchDialog, searchUpdate } from './search';
 import { send } from './vscode';
 
 const FKEYS: [key: string, label: string, hint?: string][] = [
@@ -29,6 +30,8 @@ class App {
   private codepages: string[] = [];
   private profiles: ProfileDto[] = [];
   private favourites: FavouriteDto[] = [];
+  /** The last Alt+F7, which the next one opens with. For the session only. */
+  private lastSearch: SearchQuery = { names: '', text: '', caseSensitive: false, subfolders: true };
   private filterMode = false;
   private filterText = '';
   private pendingCursor: Partial<Record<PaneId, { location: PaneLocation; entryId: string }>> = {};
@@ -190,6 +193,9 @@ class App {
       case 'focus':
         this.focusActivePane();
         break;
+      case 'search':
+        searchUpdate(message);
+        break;
     }
   }
 
@@ -261,6 +267,16 @@ class App {
       case 'focusCommandLine': return this.commandInput.focus();
       case 'editFilter': return this.editFilter();
       case 'favourites': return this.showFavourites();
+      case 'search': {
+        const location = pane.location;
+        if (!location) return;
+        const where = [location.profile, location.path].filter(Boolean).join(' ') || 'here';
+        const hit = await searchDialog(this.active, where, this.lastSearch, (query) => {
+          this.lastSearch = query;
+        });
+        if (hit) send({ type: 'reveal', pane: this.active, location: hit.location, entryId: hit.entryId });
+        return;
+      }
       case 'help': {
         await helpDialog();
         return;

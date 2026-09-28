@@ -53,6 +53,12 @@ export interface SourceItem {
    * them. Absent when the listing came back without attributes.
    */
   dataset?: DatasetSpec;
+  /**
+   * Why the content is not at hand, when it is not — `migrated` for a data set
+   * DFSMShsm has moved off, which reading would start a recall of. A search
+   * leaves such entries unread rather than set that off for each one.
+   */
+  offline?: string;
 }
 
 export interface ListOptions {

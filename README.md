@@ -49,6 +49,7 @@ src/
 │  ├─ ebcdic.ts            Local EBCDIC decoding for Shift+F3
 │  ├─ transferQueue.ts     Background queue for F5: streams source into target, with cancellation
 │  ├─ treeCopy.ts          Turns F5 on folders into folders made and files queued
+│  ├─ search.ts            Alt+F7: walks down from a pane, matching names and text
 │  ├─ spool.ts             Temporary file for uploads that must be checked before they are sent
 │  ├─ editorBridge.ts      FileSystemProvider, so F3/F4 open in a real editor
 │  ├─ text.ts              Text/binary choice and LRECL fitting, whole or streamed
@@ -70,6 +71,7 @@ webview/
 ├─ pane.ts                 One pane: header, path, rows, footer, selection
 ├─ virtualList.ts          Windowed rendering — only visible rows are built
 ├─ keymap.ts               Key → action, with dedup of forwarded keys, and the F1 list
+├─ search.ts               The Alt+F7 dialog, filled in as hits arrive
 ├─ dialogs.ts              F1 help, F5 transfer, F7 allocation, Ctrl+F filter, Ctrl+D saved views, prompts
 ├─ vscode.ts               The webview API handle; every request to the host goes through send()
 ├─ progress.ts             The busy pointer — from the webview, the host and the transfer queue
@@ -207,7 +209,7 @@ against a real LPAR through z/OSMF. Still missing:
 - [x] Streaming for large transfers
 - [x] Recursive copying of directories, PDSes and jobs
 - [ ] Moving folders (F5 copies them; a move of a folder is refused)
-- [ ] `Alt+F7` search
+- [x] `Alt+F7` search, by name and by text, in all four worlds
 - [ ] TSO and console commands on the command line
 - [ ] Recall of migrated data sets (shown, and the `HRECALL` named, but not issued)
 - [x] Unit tests for the parts that can lose data quietly — the EBCDIC

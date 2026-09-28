@@ -315,6 +315,47 @@ select.field option {
 .radio { display: flex; flex-wrap: wrap; gap: 14px; }
 .radio label { display: flex; align-items: center; gap: 5px; }
 
+/* ---------- find files (Alt+F7) ---------- */
+/* Wide enough for a path and the line the text was found on. */
+.modal.search { width: min(760px, 94vw); }
+.check { display: flex; align-items: center; gap: 5px; margin-right: 12px; }
+.hits {
+  height: 40vh;
+  min-height: 120px;
+  overflow: auto;
+  border: 1px solid var(--vscode-input-border, var(--line));
+  border-radius: 3px;
+  background: var(--vscode-input-background);
+  font-family: var(--vscode-editor-font-family);
+}
+.hits:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.hit {
+  display: flex;
+  gap: 12px;
+  padding: 1px 8px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* Fixed widths, so name, place and line read as columns down the list. */
+.hit .hn, .hit .hw, .hit .hl { overflow: hidden; text-overflow: ellipsis; }
+.hit .hn { flex: 0 0 26ch; }
+.hit .hw { flex: 0 0 24ch; color: var(--vscode-descriptionForeground); }
+.hit .hl { flex: 1 1 0; color: var(--vscode-descriptionForeground); }
+.hit.sel {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+.hit.sel .hw, .hit.sel .hl { color: inherit; }
+.notes {
+  margin: 0;
+  max-height: 6.5em;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 11.5px;
+  color: var(--vscode-editorWarning-foreground);
+}
+.notes.hidden { display: none; }
+
 /* ---------- shortcuts (F1) ---------- */
 /* Two columns, because the whole point is seeing the lot without scrolling —
    the panel is short, and a list this long would otherwise be a page to page

@@ -55,6 +55,18 @@ function tsoTrouble(described: { message: string; detail?: string }): { message:
     + 'unless changed) or your TSO profile prompts on every logon — a missing account '
     + 'number, for instance — and a system programmer has to look at it.';
 
+  // The prompt z/OSMF saw is in the body, and one of them has a known cause.
+  if (prompt && /ISPT036/.test(original)) {
+    return {
+      message: 'z/OSMF could not open your ISPF profile: another request of yours was using it.',
+      detail: 'z/OSMF runs file services in a TSO address space that logs on with ISPF. With two '
+        + 'requests at once it starts a second address space, which finds your ISPF profile '
+        + '(ISPSPROF) held by the first and stops at ISPT036. Mainframe Commander sends these '
+        + 'requests one at a time, so the other one came from elsewhere at the same moment: '
+        + 'Zowe Explorer, Zowe CLI, or an ISPF session of your own. Press F2 to try again.\n\n'
+        + original,
+    };
+  }
   if (prompt) {
     return {
       message: `z/OSMF’s TSO address space${which} is stuck at a prompt.`,
