@@ -1,3 +1,4 @@
+import type { Readable, Writable } from 'node:stream';
 import type {
   Capabilities, ColumnDef, DatasetSpec, EntryDto, FilterDto, PaneKind, PaneLocation,
   TransferOptions, ViewDto,
@@ -37,6 +38,11 @@ export interface Listing {
 export interface SourceItem {
   /** Name as it should arrive at the destination, extension included. */
   name: string;
+  /**
+   * Bytes, when the listing knows them — what the progress bar measures
+   * against. Left out where the pane's size column counts something else, like
+   * the records in a member or a spool file.
+   */
   size?: number;
   /** True when the provider knows this is text (a PDS member always is). */
   text: boolean;
@@ -98,7 +104,8 @@ export interface PaneProvider {
   recordLength?(loc: PaneLocation, entry: Entry): number | undefined;
 
   /**
-   * Reads an entry whole. Large files should go through `readStream` instead.
+   * Reads an entry whole, for the editor: VS Code wants the content as one
+   * buffer anyway. Transfers go through `readTo`, which never holds all of it.
    *
    * `options` carries the codepage the host content has to be converted from —
    * the same one F5 writes with, so viewing, editing and copying cannot end up
@@ -111,6 +118,26 @@ export interface PaneProvider {
   /** Writes `data` into `loc` under `name`, creating or replacing it. */
   write(
     loc: PaneLocation, name: string, data: Buffer,
+    options: TransferOptions, signal: AbortSignal,
+  ): Promise<void>;
+
+  /**
+   * `read` as a stream: the entry's content, converted the same way, written
+   * into `sink`, which is ended once all of it is there. On failure the sink
+   * may be left open or destroyed, and the caller has to cope with either: it
+   * owns the sink, and decides what a half copy means.
+   */
+  readTo(
+    loc: PaneLocation, entry: Entry, options: TransferOptions,
+    sink: Writable, signal: AbortSignal,
+  ): Promise<void>;
+
+  /**
+   * `write` from a stream, resolving once `source` has been read to the end and
+   * the result is in place.
+   */
+  writeFrom(
+    loc: PaneLocation, name: string, source: Readable,
     options: TransferOptions, signal: AbortSignal,
   ): Promise<void>;
 

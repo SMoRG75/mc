@@ -47,9 +47,10 @@ src/
 │  ├─ provider.ts          The PaneProvider interface + registry
 │  ├─ cursorHistory.ts     Which row the cursor was on, per listing
 │  ├─ ebcdic.ts            Local EBCDIC decoding for Shift+F3
-│  ├─ transferQueue.ts     Background queue for F5 with concurrency and cancellation
+│  ├─ transferQueue.ts     Background queue for F5: streams source into target, with cancellation
+│  ├─ spool.ts             Temporary file for uploads that must be checked before they are sent
 │  ├─ editorBridge.ts      FileSystemProvider, so F3/F4 open in a real editor
-│  ├─ text.ts              Text/binary choice and LRECL fitting
+│  ├─ text.ts              Text/binary choice and LRECL fitting, whole or streamed
 │  ├─ settings.ts          Typed reading of the mc.* settings
 │  └─ errors.ts            Digs the readable sentence out of z/OSMF errors
 ├─ providers/
@@ -58,7 +59,8 @@ src/
 │  ├─ ussProvider.ts       USS: paths, permissions, tagging
 │  └─ jesProvider.ts       JES: jobs as folders, spool DDs as files
 └─ zowe/
-   └─ sessions.ts          ProfileInfo → session, cached per profile name
+   ├─ sessions.ts          ProfileInfo → session, cached per profile name
+   └─ flow.ts              Backpressure and cancellation for the SDK's streaming calls
 
 webview/
 ├─ index.ts                App: layout, messages, actions
@@ -76,10 +78,21 @@ webview/
 `PaneProvider` is the whole extension. Local disk, datasets, USS and JES
 implement the same interface, so every key has exactly one implementation no
 matter which world the pane is showing — and F5 from LPAR1 to LPAR2 is not a
-special case, just `source.read()` followed by `target.write()`.
+special case, just `source.readTo()` streaming into `target.writeFrom()`.
 
 ### Decisions worth knowing
 
+- **Transfers stream, and are paced.** F5 never holds a whole file: the source
+  writes into a stream the target reads from, so memory stays flat however big
+  the data set. The Zowe SDK streams but ignores backpressure in both
+  directions, so `zowe/flow.ts` finds the HTTP request each call makes (through
+  Node's `http.client.request.created` channel and an `AsyncLocalStorage` set
+  around the call) and waits on it — which is also what makes cancelling a
+  running transfer actually stop it. The one exception is text going into a
+  data set with *Long lines: Abort*: the refused line can be the last one, so
+  the fitted records are spooled to a temporary file and sent only once all of
+  them fit. A local target is written beside the real name and renamed at the
+  end, so a failed copy never leaves half a file behind.
 - **JES is a file system.** Jobs are folders, spool DDs are files. That is why
   F3/F5/F8 mean the same thing there as everywhere else, without a separate
   command palette just for jobs.
@@ -177,7 +190,7 @@ All four providers are written against the Zowe v8 API and have been run
 against a real LPAR through z/OSMF. Still missing:
 
 - [x] Run against a real LPAR
-- [ ] Streaming for large transfers (reads and writes the whole buffer today)
+- [x] Streaming for large transfers
 - [ ] Recursive copying of directories and PDSes
 - [ ] `Alt+F7` search
 - [ ] TSO and console commands on the command line

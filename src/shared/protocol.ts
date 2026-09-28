@@ -173,6 +173,8 @@ export interface TransferJobDto {
   state: 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
   /** 0..1, or undefined when the total size is unknown. */
   progress?: number;
+  /** Bytes moved so far — all there is to show when the total is unknown. */
+  bytes?: number;
   error?: string;
 }
 

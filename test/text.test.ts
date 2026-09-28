@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fitToRecordLength, isBinary, resolveMode } from '../src/core/text';
+import { Readable } from 'node:stream';
+import { text as collect } from 'node:stream/consumers';
+import { fitToRecordLength, isBinary, RecordFitter, resolveMode } from '../src/core/text';
 import { UserFacingError } from '../src/core/errors';
 import type { TransferOptions } from '../src/shared/protocol';
 
@@ -70,4 +72,48 @@ test('auto falls back to text, because text is the recoverable mistake', () => {
   // An explicit choice is never second-guessed by the extension list.
   assert.equal(resolveMode(options({ mode: 'text' }), 'archive.zip', exts), 'text');
   assert.equal(resolveMode(options({ mode: 'binary' }), 'readme.md', exts), 'binary');
+});
+
+/** Streams `content` through a RecordFitter in pieces of `size` bytes. */
+function fitStreamed(
+  content: string, lrecl: number, longLines: TransferOptions['longLines'], size: number,
+): Promise<string> {
+  const bytes = Buffer.from(content, 'utf8');
+  const pieces: Buffer[] = [];
+  for (let at = 0; at < bytes.length; at += size) pieces.push(bytes.subarray(at, at + size));
+  return collect(Readable.from(pieces).pipe(new RecordFitter(lrecl, longLines)));
+}
+
+test('streaming gives the same records however the text is cut up', async () => {
+  // Every piece size from 1 byte up: cuts land between CR and LF, inside a
+  // multi-byte character, on a line break and in the middle of a long line.
+  const content = 'ABC\r\nDEF\rGHI\n\næøå €\r\nJKLMNOPQRSTUVWXYZ\r\n\r\nlast';
+  for (const longLines of ['wrap', 'truncate'] as const) {
+    const whole = fitToRecordLength(content, 5, longLines).map((record) => `${record}\n`).join('');
+    for (let size = 1; size <= Buffer.byteLength(content); size += 1) {
+      assert.equal(await fitStreamed(content, 5, longLines, size), whole, `${longLines}, pieces of ${size}`);
+    }
+  }
+});
+
+test('streaming an empty file gives no records at all', async () => {
+  assert.equal(await fitStreamed('', 80, 'abort', 16), '');
+  assert.equal(await fitStreamed('\n', 80, 'abort', 16), '\n', 'one empty line is one empty record');
+});
+
+test('a streamed abort names the line even when it arrives in pieces', async () => {
+  await assert.rejects(fitStreamed(`ok\n${'X'.repeat(132)}\nmore`, 80, 'abort', 7), (err: unknown) => {
+    assert.ok(err instanceof UserFacingError);
+    assert.match(err.message, /Line 2 is 132 characters/);
+    return true;
+  });
+});
+
+test('a line with no end still streams through wrap and truncate', async () => {
+  // Text mode on something that is not text: 8 MB and not one line break.
+  // Wrap and truncate must both keep going; neither needs the whole line.
+  const huge = 'X'.repeat(8 * 1024 * 1024);
+  const wrapped = await fitStreamed(huge, 80, 'wrap', 64 * 1024);
+  assert.equal(wrapped.length, huge.length + Math.ceil(huge.length / 80));
+  assert.equal(await fitStreamed(huge, 80, 'truncate', 64 * 1024), `${'X'.repeat(80)}\n`);
 });

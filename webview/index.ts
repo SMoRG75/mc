@@ -212,7 +212,15 @@ class App {
       bar.append(fill);
       const count = document.createElement('span');
       count.textContent = `${jobs.length - running.length + 1} of ${jobs.length}`;
-      this.statusBar.append(label, bar, count);
+      this.statusBar.append(label, bar);
+      if (first.bytes) {
+        // A member or a spool file has no byte size to fill the bar against,
+        // so the amount so far is the only sign that anything is moving.
+        const moved = document.createElement('span');
+        moved.textContent = formatBytes(first.bytes);
+        this.statusBar.append(moved);
+      }
+      this.statusBar.append(count);
     }
     for (const job of failed) {
       const error = document.createElement('span');
@@ -503,6 +511,20 @@ function isDatasetFilter(path: string): boolean {
 function highLevelQualifier(filter: string): string {
   const stem = filter.replace(/\.?[*%][^.]*$/, '').replace(/\.$/, '');
   return stem ? `'${stem}.` : '';
+}
+
+/** 1,234 B, 12.3 MB — binary units, as the transfer is measured in them. */
+function formatBytes(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return unit === 0
+    ? `${value.toLocaleString('en-US')} B`
+    : `${value.toFixed(1)} ${units[unit]}`;
 }
 
 new App(document.getElementById('app') as HTMLElement);

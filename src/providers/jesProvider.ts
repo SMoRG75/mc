@@ -1,5 +1,6 @@
-import { DeleteJobs, GetJobs, SubmitJobs } from '@zowe/zos-jobs-for-zowe-sdk';
-import type { IJob } from '@zowe/zos-jobs-for-zowe-sdk';
+import type { Writable } from 'node:stream';
+import { DeleteJobs, DownloadJobs, GetJobs, SubmitJobs } from '@zowe/zos-jobs-for-zowe-sdk';
+import type { IJob, IJobFile } from '@zowe/zos-jobs-for-zowe-sdk';
 import type { AbstractSession } from '@zowe/imperative';
 import type {
   Capabilities, ColumnDef, FilterDto, PaneLocation, TransferOptions, ViewDto,
@@ -7,6 +8,7 @@ import type {
 import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
 import type { SessionManager } from '../zowe/sessions';
 import { UserFacingError } from '../core/errors';
+import { pacedDownload } from '../zowe/flow';
 
 type JesRef =
   | { kind: 'job'; jobname: string; jobid: string; job: IJob }
@@ -216,7 +218,8 @@ export class JesProvider implements PaneProvider {
     const ref = entry.ref as JesRef;
     return ref.kind === 'spool'
       // Spool output lands next door as a plain text file, named so it stays sortable.
-      ? { name: `${ref.jobid}.${ref.ddname}.txt`, size: entry.dto.size, text: true }
+      // The size column is a record count, so it is no measure of the bytes.
+      ? { name: `${ref.jobid}.${ref.ddname}.txt`, text: true }
       : { name: `${ref.jobid}.jcl`, text: true };
   }
 
@@ -231,11 +234,42 @@ export class JesProvider implements PaneProvider {
     return Buffer.from(String(content), 'utf8');
   }
 
+  /**
+   * A spool file can run to millions of lines, so it is streamed; the JCL is a
+   * few records at most and comes back as one string whatever we do.
+   */
+  async readTo(
+    loc: PaneLocation, entry: Entry, options: TransferOptions, sink: Writable, signal: AbortSignal,
+  ): Promise<void> {
+    const ref = entry.ref as JesRef;
+    if (ref.kind !== 'spool') {
+      const jcl = await this.read(loc, entry, options);
+      await new Promise<void>((resolve, reject) => {
+        sink.once('error', reject);
+        sink.end(jcl, resolve);
+      });
+      return;
+    }
+    const session = await this.sessions.session(loc.profile);
+    // Only the fields the download builds its URL from; the rest of an IJobFile
+    // describes the spool file, which the SDK has no use for here.
+    const jobFile = {
+      jobname: ref.jobname, jobid: ref.jobid, id: ref.spoolId, ddname: ref.ddname,
+    } as IJobFile;
+    await pacedDownload(sink, signal, (stream) => DownloadJobs.downloadSpoolContentCommon(session, {
+      jobFile, stream, encoding: options.codepage,
+    }));
+  }
+
   async write(): Promise<void> {
     throw new UserFacingError(
       'You cannot write into the JES queue.',
       'Use F9 to submit JCL from a dataset or a USS file instead.',
     );
+  }
+
+  async writeFrom(): Promise<void> {
+    return this.write();
   }
 
   async exists(): Promise<boolean> {

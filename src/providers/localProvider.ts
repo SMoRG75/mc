@@ -1,5 +1,9 @@
+import { randomBytes } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import type { Readable, Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type { Capabilities, ColumnDef, PaneLocation, TransferOptions } from '../shared/protocol';
 import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
 
@@ -100,6 +104,31 @@ export class LocalProvider implements PaneProvider {
 
   async write(loc: PaneLocation, name: string, data: Buffer, _options: TransferOptions): Promise<void> {
     await fs.writeFile(path.join(loc.path, name), data);
+  }
+
+  async readTo(
+    _loc: PaneLocation, entry: Entry, _options: TransferOptions, sink: Writable, signal: AbortSignal,
+  ): Promise<void> {
+    await pipeline(createReadStream((entry.ref as LocalRef).fullPath), sink, { signal });
+  }
+
+  /**
+   * Writes next to the target and renames over it at the end. A transfer that
+   * fails halfway would otherwise leave half a file under the real name — or,
+   * worse, half of a new version over a complete old one.
+   */
+  async writeFrom(
+    loc: PaneLocation, name: string, source: Readable, _options: TransferOptions, signal: AbortSignal,
+  ): Promise<void> {
+    const target = path.join(loc.path, name);
+    const partial = `${target}.${randomBytes(4).toString('hex')}.part`;
+    try {
+      await pipeline(source, createWriteStream(partial, { flags: 'wx' }), { signal });
+      await fs.rename(partial, target);
+    } catch (err) {
+      await fs.rm(partial, { force: true });
+      throw err;
+    }
   }
 
   async exists(loc: PaneLocation, name: string): Promise<boolean> {

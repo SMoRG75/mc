@@ -1,7 +1,10 @@
-import { Create, Delete, Get, List, Upload, Utilities } from '@zowe/zos-files-for-zowe-sdk';
+import type { Readable, Writable } from 'node:stream';
+import { Create, Delete, Download, Get, List, Upload, Utilities } from '@zowe/zos-files-for-zowe-sdk';
+import type { AbstractSession } from '@zowe/imperative';
 import type { Capabilities, ColumnDef, PaneLocation, TransferOptions } from '../shared/protocol';
 import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
 import type { SessionManager } from '../zowe/sessions';
+import { pacedDownload, pacedUpload } from '../zowe/flow';
 import { resolveMode } from '../core/text';
 
 interface UssRef { path: string; isDirectory: boolean }
@@ -105,26 +108,55 @@ export class UssProvider implements PaneProvider {
   async read(loc: PaneLocation, entry: Entry, transfer: TransferOptions): Promise<Buffer> {
     const session = await this.sessions.session(loc.profile);
     const ref = entry.ref as UssRef;
-    // A binary read is the caller saying "the bytes, untouched" — Shift+F3 and
-    // an extension on the binary list both mean it, and the file's tag must not
-    // convert them back out from under it.
-    if (resolveMode(transfer, basename(ref.path), this.settings.binaryExtensions()) === 'binary') {
-      return Get.USSFile(session, ref.path, { binary: true });
+    return Get.USSFile(session, ref.path, await this.readOptions(session, ref.path, transfer));
+  }
+
+  async readTo(
+    loc: PaneLocation, entry: Entry, transfer: TransferOptions, sink: Writable, signal: AbortSignal,
+  ): Promise<void> {
+    const session = await this.sessions.session(loc.profile);
+    const ref = entry.ref as UssRef;
+    const options = await this.readOptions(session, ref.path, transfer);
+    await pacedDownload(sink, signal, (stream) => Download.ussFile(session, ref.path, { ...options, stream }));
+  }
+
+  /**
+   * A binary read is the caller saying "the bytes, untouched" — Shift+F3 and an
+   * extension on the binary list both mean it, and the file's tag must not
+   * convert them back out from under it. Otherwise the file's own tag knows
+   * better than any default we could pick — but an untagged file has to be
+   * read as something, and the configured codepage is a far better guess than
+   * the service default.
+   */
+  private async readOptions(
+    session: AbstractSession, path: string, transfer: TransferOptions,
+  ): Promise<{ binary?: boolean; encoding?: string }> {
+    if (resolveMode(transfer, basename(path), this.settings.binaryExtensions()) === 'binary') {
+      return { binary: true };
     }
-    // Otherwise the file's own tag knows better than any default we could pick —
-    // but an untagged file has to be read as something, and the configured
-    // codepage is a far better guess than the service default.
     const options: { binary?: boolean; encoding?: string } = { encoding: transfer.codepage };
-    await Utilities.applyTaggedEncoding(session, ref.path, options).catch(() => undefined);
+    await Utilities.applyTaggedEncoding(session, path, options).catch(() => undefined);
     if (options.binary) delete options.encoding;
-    return Get.USSFile(session, ref.path, options);
+    return options;
   }
 
   async write(loc: PaneLocation, name: string, data: Buffer, options: TransferOptions): Promise<void> {
     const session = await this.sessions.session(loc.profile);
-    const mode = resolveMode(options, name, this.settings.binaryExtensions());
-    await Upload.bufferToUssFile(session, join(loc.path, name), data,
-      mode === 'binary' ? { binary: true } : { encoding: options.codepage });
+    await Upload.bufferToUssFile(session, join(loc.path, name), data, this.writeOptions(name, options));
+  }
+
+  async writeFrom(
+    loc: PaneLocation, name: string, source: Readable, options: TransferOptions, signal: AbortSignal,
+  ): Promise<void> {
+    const session = await this.sessions.session(loc.profile);
+    await pacedUpload(source, signal, (body) =>
+      Upload.streamToUssFile(session, join(loc.path, name), body, this.writeOptions(name, options)));
+  }
+
+  private writeOptions(name: string, options: TransferOptions): { binary?: boolean; encoding?: string } {
+    return resolveMode(options, name, this.settings.binaryExtensions()) === 'binary'
+      ? { binary: true }
+      : { encoding: options.codepage };
   }
 
   async exists(loc: PaneLocation, name: string): Promise<boolean> {

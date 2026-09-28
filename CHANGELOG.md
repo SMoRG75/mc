@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.10.0 — 2026-09-28
+
+- Transfers stream. `F5` and `F6` no longer read the whole source into memory
+  before writing it: the bytes go from one side to the other through a stream,
+  paced so that neither a slow host nor a slow disk makes the other end buffer
+  the rest. Spool files are streamed too.
+- Cancelling a running transfer stops it, rather than letting it finish and
+  then calling it cancelled. A download whose connection breaks off now fails
+  instead of waiting for ever.
+- A copy to local disk is written under a temporary name and renamed at the
+  end, so a transfer that fails leaves the old file, or none, instead of half
+  of one.
+- Text into a data set with *Long lines: Abort* is checked in full, spooled
+  through a temporary file, before anything is sent — the transfer is still
+  refused before the host is touched.
+- The status bar shows how much has been moved, which is the only measure there
+  is for members and spool files, whose size column counts records.
+- An empty text file written to a data set becomes an empty member, not one
+  with a single blank record.
+- Spool files copied to local disk on Windows now get CRLF line endings, like
+  data sets and USS files already did.
+- Dropdowns in the dialogs are drawn like the text fields next to them — same
+  height, border and width, in the theme's dropdown colours — instead of by
+  the operating system.
+- The bundled Zowe SDKs are updated to 8.38.0.
+
 ## 0.9.0 — 2026-09-20
 
 First release. Feature-complete for day-to-day work on the four worlds, but
@@ -23,7 +49,7 @@ short of 1.0 on the points listed under *Not yet* below.
 ### Not yet
 
 - Streaming for large transfers — a copy reads and writes the whole buffer, so
-  a very large data set or file is held in memory end to end.
+  a very large data set or file is held in memory end to end. *(Done since.)*
 - Recursive copying of directories and PDSes. `F5` on a folder is refused
   rather than attempted.
 - `Alt+F7` search, TSO and console commands on the command line.

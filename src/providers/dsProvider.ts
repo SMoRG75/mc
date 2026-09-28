@@ -1,4 +1,7 @@
-import { Create, CreateDataSetTypeEnum, Delete, Get, List, Rename, Upload } from '@zowe/zos-files-for-zowe-sdk';
+import { pipeline, type Readable, type Writable } from 'node:stream';
+import {
+  Create, CreateDataSetTypeEnum, Delete, Download, Get, List, Rename, Upload,
+} from '@zowe/zos-files-for-zowe-sdk';
 import type { ICreateDataSetOptions, IZosFilesResponse } from '@zowe/zos-files-for-zowe-sdk';
 import type { AbstractSession } from '@zowe/imperative';
 import type {
@@ -7,7 +10,9 @@ import type {
 import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
 import type { SessionManager } from '../zowe/sessions';
 import { describeError, UserFacingError } from '../core/errors';
-import { fitToRecordLength, resolveMode } from '../core/text';
+import { spooled } from '../core/spool';
+import { fitToRecordLength, RecordFitter, resolveMode } from '../core/text';
+import { pacedDownload, pacedUpload } from '../zowe/flow';
 
 export interface DsSettings {
   pageSize: () => number;
@@ -226,8 +231,10 @@ export class DsProvider implements PaneProvider {
 
   describe(_loc: PaneLocation, entry: Entry): SourceItem {
     const ref = entry.ref as DsRef;
-    // Datasets hold records, not bytes: they are always text unless the user says otherwise.
-    return { name: ref.kind === 'member' ? ref.member : ref.dsname, size: entry.dto.size, text: true };
+    // Datasets hold records, not bytes: they are always text unless the user
+    // says otherwise, and the size column — a record count, or a load module's
+    // length — says nothing about how many bytes a transfer will move.
+    return { name: ref.kind === 'member' ? ref.member : ref.dsname, text: true };
   }
 
   recordLength(_loc: PaneLocation, entry: Entry): number | undefined {
@@ -243,35 +250,79 @@ export class DsProvider implements PaneProvider {
    */
   async read(loc: PaneLocation, entry: Entry, options: TransferOptions): Promise<Buffer> {
     const session = await this.sessions.session(loc.profile);
-    const ref = entry.ref as DsRef;
+    return Get.dataSet(session, qualify(entry.ref as DsRef), this.readOptions(loc, entry, options));
+  }
+
+  async readTo(
+    loc: PaneLocation, entry: Entry, options: TransferOptions, sink: Writable, signal: AbortSignal,
+  ): Promise<void> {
+    const session = await this.sessions.session(loc.profile);
+    const dsname = qualify(entry.ref as DsRef);
+    await pacedDownload(sink, signal, (stream) =>
+      Download.dataSet(session, dsname, { ...this.readOptions(loc, entry, options), stream }));
+  }
+
+  private readOptions(
+    loc: PaneLocation, entry: Entry, options: TransferOptions,
+  ): { binary?: boolean; encoding?: string } {
     const mode = resolveMode(options, this.describe(loc, entry).name, this.settings.binaryExtensions());
-    return Get.dataSet(
-      session, qualify(ref),
-      mode === 'binary' ? { binary: true } : { encoding: options.codepage },
-    );
+    return mode === 'binary' ? { binary: true } : { encoding: options.codepage };
   }
 
   async write(
     loc: PaneLocation, name: string, data: Buffer, options: TransferOptions,
   ): Promise<void> {
     const session = await this.sessions.session(loc.profile);
-    const target = isFilter(loc.path) ? name : `${loc.path}(${memberName(name)})`;
-    const mode = resolveMode(options, name, this.settings.binaryExtensions());
+    const target = targetOf(loc, name);
 
-    if (mode === 'binary') {
+    if (resolveMode(options, name, this.settings.binaryExtensions()) === 'binary') {
       await Upload.bufferToDataSet(session, data, target, { binary: true });
       return;
     }
 
-    const attributes = await this.attributes(session, isFilter(loc.path) ? name : loc.path);
-    const lrecl = Number(attributes?.lrecl ?? 80) || 80;
-    const lines = fitToRecordLength(data.toString('utf8'), lrecl, options.longLines);
+    const lrecl = await this.recordLengthFor(session, loc, name);
+    const records = fitToRecordLength(data.toString('utf8'), lrecl, options.longLines);
     await Upload.bufferToDataSet(
       session,
-      Buffer.from(`${lines.join('\n')}\n`, 'utf8'),
+      // Each record ends in a newline rather than being joined by one: an empty
+      // file is no records, not one blank record.
+      Buffer.from(records.map((record) => `${record}\n`).join(''), 'utf8'),
       target,
       { encoding: options.codepage },
     );
+  }
+
+  /**
+   * Text is fitted to the record length on the way through. `abort` is the
+   * exception to streaming straight to the host: the line it refuses can be the
+   * last one, so the fitted records are spooled to disk first and only sent
+   * once all of them are known to fit.
+   */
+  async writeFrom(
+    loc: PaneLocation, name: string, source: Readable, options: TransferOptions, signal: AbortSignal,
+  ): Promise<void> {
+    const session = await this.sessions.session(loc.profile);
+    const target = targetOf(loc, name);
+    const upload = (body: Readable, settings: { binary?: boolean; encoding?: string }) =>
+      pacedUpload(body, signal, (stream) => Upload.streamToDataSet(session, stream, target, settings));
+
+    if (resolveMode(options, name, this.settings.binaryExtensions()) === 'binary') {
+      await upload(source, { binary: true });
+      return;
+    }
+
+    const lrecl = await this.recordLengthFor(session, loc, name);
+    const records = pipeline(source, new RecordFitter(lrecl, options.longLines), () => undefined);
+    const text = { encoding: options.codepage };
+    await (options.longLines === 'abort'
+      ? spooled(records, signal, (replay) => upload(replay, text))
+      : upload(records, text));
+  }
+
+  /** What text has to be fitted to: the target's LRECL, or 80 for one that is not there yet. */
+  private async recordLengthFor(session: AbstractSession, loc: PaneLocation, name: string): Promise<number> {
+    const attributes = await this.attributes(session, isFilter(loc.path) ? name : loc.path);
+    return Number(attributes?.lrecl ?? 80) || 80;
   }
 
   async exists(loc: PaneLocation, name: string): Promise<boolean> {
@@ -473,6 +524,11 @@ function isFilter(path: string): boolean {
 
 function isPartitioned(dsorg: string | undefined): boolean {
   return dsorg?.startsWith('PO') ?? false;
+}
+
+/** A new dataset at filter level, a member inside a PDS. */
+function targetOf(loc: PaneLocation, name: string): string {
+  return isFilter(loc.path) ? name : `${loc.path}(${memberName(name)})`;
 }
 
 function qualify(ref: DsRef): string {
