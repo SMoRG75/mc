@@ -106,7 +106,7 @@ export class DsProvider implements PaneProvider {
   private async listDataSets(
     session: AbstractSession, filter: string, limit: number, signal: AbortSignal,
   ): Promise<Listing> {
-    const { response, withAttributes } = await this.listWithAttributeFallback(session, filter);
+    const { response, withAttributes } = await this.listWithAttributeFallback(session, filter, limit);
     signal.throwIfAborted();
     const items = (response.apiResponse?.items ?? []) as ZosmfDataSet[];
 
@@ -140,8 +140,8 @@ export class DsProvider implements PaneProvider {
       columns: DATASET_COLUMNS,
       entries,
       status: withAttributes
-        ? `${items.length} data set${items.length === 1 ? '' : 's'}`
-        : `${items.length} data set${items.length === 1 ? '' : 's'} · without attributes`,
+        ? counted(items.length, limit, 'data set')
+        : `${counted(items.length, limit, 'data set')} · without attributes`,
       truncated: items.length > limit,
     };
   }
@@ -161,17 +161,20 @@ export class DsProvider implements PaneProvider {
    * re-thrown only if the plain listing fails too, since that one is real.
    */
   private async listWithAttributeFallback(
-    session: AbstractSession, filter: string,
+    session: AbstractSession, filter: string, limit: number,
   ): Promise<{ response: IZosFilesResponse; withAttributes: boolean }> {
+    // No more than the pane shows, and one to tell whether there was more:
+    // z/OSMF builds the list in TSO and gives up on it after 30 seconds.
+    const cap = capped(limit);
     try {
-      return { response: await List.dataSet(session, filter, { attributes: true }), withAttributes: true };
+      return { response: await List.dataSet(session, filter, { attributes: true, ...cap }), withAttributes: true };
     } catch (rich) {
       // Worth keeping even when the fallback works: the TSO services failing
       // here are the ones everything else then trips over.
       const { message, detail } = describeError(rich);
       log.warn(`Listing '${filter}' with attributes failed; listing it without them: ${message}`, detail);
       try {
-        return { response: await List.dataSet(session, filter, {}), withAttributes: false };
+        return { response: await List.dataSet(session, filter, cap), withAttributes: false };
       } catch {
         throw explainListFailure(rich, filter);
       }
@@ -182,7 +185,7 @@ export class DsProvider implements PaneProvider {
     session: AbstractSession, dsname: string, limit: number, signal: AbortSignal,
   ): Promise<Listing> {
     const [members, attributes] = await Promise.all([
-      List.allMembers(session, dsname, { attributes: true }),
+      List.allMembers(session, dsname, { attributes: true, ...capped(limit) }),
       this.attributes(session, dsname).catch(() => undefined),
     ]);
     signal.throwIfAborted();
@@ -212,7 +215,7 @@ export class DsProvider implements PaneProvider {
       title: shape ? `${dsname} (${shape})` : dsname,
       columns: load ? LOAD_COLUMNS : MEMBER_COLUMNS,
       entries,
-      status: attributes?.vol ? `VOL=${attributes.vol}` : `${items.length} member${items.length === 1 ? '' : 's'}`,
+      status: attributes?.vol ? `VOL=${attributes.vol}` : counted(items.length, limit, 'member'),
       truncated: items.length > limit,
     };
   }
@@ -636,6 +639,20 @@ function isFilter(path: string): boolean {
 
 function isPartitioned(dsorg: string | undefined): boolean {
   return dsorg?.startsWith('PO') ?? false;
+}
+
+/**
+ * `12 data sets`, or `1000+ data sets` for a listing cut off at the limit —
+ * the one extra entry asked for only says that there were more, not how many.
+ */
+function counted(found: number, limit: number, noun: string): string {
+  const shown = found > limit ? `${limit}+` : String(found);
+  return `${shown} ${noun}${found === 1 ? '' : 's'}`;
+}
+
+/** `limit` entries and one more to tell whether there were more; all of them for no limit. */
+function capped(limit: number): { maxLength?: number } {
+  return Number.isFinite(limit) ? { maxLength: limit + 1 } : {};
 }
 
 /** A new dataset at filter level, a member inside a PDS. */

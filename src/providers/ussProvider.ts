@@ -37,16 +37,22 @@ export class UssProvider implements PaneProvider {
   async list(loc: PaneLocation, signal: AbortSignal, options?: ListOptions): Promise<Listing> {
     const session = await this.sessions.session(loc.profile);
     const dir = loc.path || '/';
-    const response = await List.fileList(session, dir, {});
+    const limit = options?.all ? Infinity : this.settings.pageSize();
+    // Asked for no more than the pane will show. z/OSMF puts a listing
+    // together entry by entry in the user's TSO address space, and gives up
+    // after 30 seconds: at around 30 ms an entry on some systems, a directory
+    // like /z with every user's home in it does not come back at all when
+    // asked for in full. Two more for '.' and '..', one more to see whether
+    // there was more than the pane shows.
+    const response = await List.fileList(session, dir, capped(limit, 3));
     signal.throwIfAborted();
 
-    const items = (response.apiResponse?.items ?? []) as ZosmfUssItem[];
-    const limit = options?.all ? Infinity : this.settings.pageSize();
+    // z/OSMF returns '.' and '..'; the pane draws its own '..' row.
+    const items = ((response.apiResponse?.items ?? []) as ZosmfUssItem[])
+      .filter((item) => item.name !== '.' && item.name !== '..');
     let bytes = 0;
 
     const entries: Entry<UssRef>[] = items
-      // z/OSMF returns '.' and '..'; the pane draws its own '..' row.
-      .filter((item) => item.name !== '.' && item.name !== '..')
       .slice(0, limit)
       .map((item) => {
         const isDirectory = item.mode?.startsWith('d') ?? false;
@@ -210,6 +216,14 @@ export class UssProvider implements PaneProvider {
     }
     return ids;
   }
+}
+
+/**
+ * The `maxLength` that asks for `limit` entries plus `extra` — or for all of
+ * them, which is what z/OSMF takes an absent one to mean.
+ */
+function capped(limit: number, extra: number): { maxLength?: number } {
+  return Number.isFinite(limit) ? { maxLength: limit + extra } : {};
 }
 
 function join(dir: string, name: string): string {

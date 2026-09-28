@@ -50,8 +50,9 @@ async function call<T>(name: string, args: unknown[], run: () => Promise<T>): Pr
     log.debug(`${what} ${elapsed(started)}`);
     return result;
   } catch (err) {
-    const { message, detail } = describeError(err);
-    log.debug(`${what} failed ${elapsed(started)}: ${message}`, detail);
+    // The message only: whoever shows the error to the user logs it in full,
+    // and a z/OSMF detail is too long to read twice.
+    log.debug(`${what} failed ${elapsed(started)}: ${describeError(err).message}`);
     throw err;
   }
 }

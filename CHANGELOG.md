@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.11.1 — 2026-09-28
+
+- A pane asks z/OSMF for no more entries than it shows (`mc.list.pageSize`),
+  where it used to ask for all of them and drop the rest. z/OSMF builds a
+  listing one entry at a time in the user's TSO address space and gives up
+  after 30 seconds: on IBM's Z Xplore that is about 30 ms an entry, so `/z`,
+  which holds every user's home directory, timed out every time. It now lists
+  the first page, marked as cut off. A copy of a folder still lists all of it.
+- A cut-off data set or member list says `1000+`, not the one extra entry that
+  was only fetched to find out there were more.
+- A TSO timeout is explained as what it usually is — more than z/OSMF could do
+  in 30 seconds — before the stuck address space it can also be.
+- The log takes out anything that looks like a credential, whatever wrote it,
+  and a failed operation's z/OSMF detail is written once rather than twice.
+
 ## 0.11.0 — 2026-09-28
 
 - `F5` copies folders. A directory, a PDS or a job is copied with everything

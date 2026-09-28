@@ -45,22 +45,36 @@ function tsoTrouble(described: { message: string; detail?: string }): { message:
   const asid = /ASID=0x([0-9a-f]+)/i.exec(original)?.[1]?.toUpperCase().padStart(4, '0');
   const which = user && asid ? ` for ${user} (ASID X'${asid}')` : ' for your user';
 
+  const stuck = 'Usually an earlier request made TSO ask something nobody can answer, such as '
+    + 'DFSMShsm asking whether to recall a migrated data set, and it then answers nothing '
+    + 'else either. z/OSMF ends it after its own timeout, and the next request gets a new '
+    + 'one: wait a few minutes and press F2. Sooner than that, an operator can cancel it'
+    + (asid ? ` — in SDSF DA, the address space with ASID ${asid}` : '')
+    + '.\n\n'
+    + 'If it comes back every time, the logon procedure z/OSMF starts TSO with (IZUFPROC '
+    + 'unless changed) or your TSO profile prompts on every logon — a missing account '
+    + 'number, for instance — and a system programmer has to look at it.';
+
+  if (prompt) {
+    return {
+      message: `z/OSMF’s TSO address space${which} is stuck at a prompt.`,
+      detail: 'The request itself is not the problem — z/OSMF runs file services in a TSO '
+        + `address space, and that one has stopped. ${stuck}\n\n${original}`,
+    };
+  }
+  // A timeout is more often the request than the address space: z/OSMF puts a
+  // listing together one entry at a time, and on some systems that is slow
+  // enough — about 30 ms an entry on IBM's Z Xplore, where /z holds every
+  // user's home — for a big directory not to fit in the 30 seconds it allows.
   return {
-    message: prompt
-      ? `z/OSMF’s TSO address space${which} is stuck at a prompt.`
-      : `z/OSMF’s TSO address space${which} is not answering.`,
-    detail: 'The request itself is not the problem — z/OSMF runs file services in a TSO '
-      + 'address space, and that one has stopped. Usually an earlier request made TSO ask '
-      + 'something nobody can answer, such as DFSMShsm asking whether to recall a migrated '
-      + 'data set, and it then answers nothing else either.\n\n'
-      + 'z/OSMF ends it after its own timeout, and the next request gets a new one: wait a '
-      + 'few minutes and press F2. Sooner than that, an operator can cancel it'
-      + (asid ? ` — in SDSF DA, the address space with ASID ${asid}` : '')
-      + '.\n\n'
-      + 'If it comes back every time, the logon procedure z/OSMF starts TSO with (IZUFPROC '
-      + 'unless changed) or your TSO profile prompts on every logon — a missing account '
-      + 'number, for instance — and a system programmer has to look at it.\n\n'
-      + original,
+    message: `z/OSMF’s TSO address space${which} did not answer within 30 seconds.`,
+    detail: 'Either the request was more than it could do in that time, or the address '
+      + 'space has stopped.\n\n'
+      + 'A listing is the usual case: z/OSMF builds it one entry at a time, and a directory '
+      + 'or filter with many thousands of entries can take longer than it allows. Go '
+      + 'straight to the directory you want with `cd` on the command line, narrow the filter, '
+      + 'or lower `mc.list.pageSize` — a pane only asks for that many entries.\n\n'
+      + `If even small requests time out, the address space is stuck. ${stuck}\n\n${original}`,
   };
 }
 

@@ -44,11 +44,25 @@ class Log {
 
   private write(level: LogLevel, message: string, detail?: string): void {
     if (!this.enabled(level)) return;
-    this.sink!.appendLine(`${timestamp()} [${level}] ${message}`);
+    this.sink!.appendLine(`${timestamp()} [${level}] ${redact(message)}`);
     // Indented under the line it belongs to, so a z/OSMF message of several
     // lines reads as part of one entry rather than as entries of its own.
-    if (detail) this.sink!.appendLine(detail.replace(/^/gm, '    '));
+    if (detail) this.sink!.appendLine(redact(detail).replace(/^/gm, '    '));
   }
+}
+
+/**
+ * Takes out anything that looks like a credential, whatever wrote it.
+ *
+ * Nothing of ours logs one, and Imperative's error dump lists the request's
+ * headers without the one that authenticates it — but that is its choice, not
+ * ours, and a log is exactly the thing that gets pasted into an issue.
+ */
+export function redact(text: string): string {
+  return text
+    .replace(/\b(Basic|Bearer)\s+[A-Za-z0-9+/=._~-]{8,}/g, '$1 ***')
+    .replace(/("?(?:Authorization|Cookie|Set-Cookie)"?\s*[:=]\s*"?)[^"\n,}]+/gi, '$1***')
+    .replace(/\b(LtpaToken2|jwtToken|apimlAuthenticationToken)=[^;\s"]+/g, '$1=***');
 }
 
 export const log = new Log();

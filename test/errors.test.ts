@@ -63,12 +63,16 @@ test('a TSO address space stuck at a prompt is explained, wherever it surfaces',
   assert.match(detail ?? '', /received TSO Prompt/, 'the original is kept for whoever has to look into it');
 });
 
-test('a TSO address space that does not answer is named, so an operator can find it', () => {
+test('a TSO timeout points at the request first, and names the address space for an operator', () => {
+  // Reproduced on IBM Z Xplore: /z in full takes over 30 seconds, /z capped at
+  // five entries three. So the likelier story comes first.
   const { message, detail } = describeError({
     message: 'receiveResponseHeader: timeout receiving response (>30 secs): '
       + 'TsoServerConnection(USER=Z29016, ASID=0x00df, QID=0x0033002c)',
   });
-  assert.equal(message, "z/OSMF’s TSO address space for Z29016 (ASID X'00DF') is not answering.");
+  assert.equal(message, "z/OSMF’s TSO address space for Z29016 (ASID X'00DF') did not answer within 30 seconds.");
+  assert.match(detail ?? '', /^Either the request was more than it could do/);
+  assert.match(detail ?? '', /mc\.list\.pageSize/);
   assert.match(detail ?? '', /SDSF DA, the address space with ASID 00DF/);
 });
 
