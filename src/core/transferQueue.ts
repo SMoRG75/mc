@@ -3,6 +3,7 @@ import { Transform } from 'node:stream';
 import type { PaneLocation, TransferJobDto, TransferOptions } from '../shared/protocol';
 import type { Entry, PaneProvider } from './provider';
 import { describeError } from './errors';
+import { log } from './log';
 
 export interface TransferRequest {
   source: PaneProvider;
@@ -81,6 +82,9 @@ export class TransferQueue {
   }
 
   private async run(job: Job): Promise<void> {
+    const what = `${place(job.sourceLoc)} ${job.entry.dto.name} → ${place(job.targetLoc)} ${job.name}`;
+    const started = performance.now();
+    log.debug(`Transfer started: ${what}`);
     try {
       await this.copy(job);
       if (job.move) {
@@ -88,9 +92,13 @@ export class TransferQueue {
       }
       job.state = 'done';
       job.progress = 1;
+      log.info(`Transferred ${what}: ${job.bytes ?? 0} bytes in ${Math.round(performance.now() - started)} ms`);
     } catch (err) {
       job.state = job.abort.signal.aborted ? 'cancelled' : 'failed';
-      job.error = describeError(err).message;
+      const { message, detail } = describeError(err);
+      job.error = message;
+      if (job.state === 'cancelled') log.info(`Transfer cancelled: ${what}`);
+      else log.error(`Transfer failed: ${what}: ${message}`, detail);
     } finally {
       this.running -= 1;
       this.onFinished(job);
@@ -175,4 +183,9 @@ export class TransferQueue {
       error: j.error,
     })));
   }
+}
+
+/** Where a transfer is from or to, as the log shows it. */
+function place(loc: PaneLocation): string {
+  return `${loc.kind}:${loc.profile || '-'}:${loc.path || '/'}`;
 }

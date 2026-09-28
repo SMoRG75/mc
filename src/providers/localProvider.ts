@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import type { Readable, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { Capabilities, ColumnDef, PaneLocation, TransferOptions } from '../shared/protocol';
-import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
+import type { Entry, Listing, ListOptions, PaneProvider, SourceItem } from '../core/provider';
 
 interface LocalRef { fullPath: string; isDirectory: boolean }
 
@@ -31,12 +31,12 @@ export class LocalProvider implements PaneProvider {
     return { write: true, delete: true, rename: true, create: true, submit: false };
   }
 
-  async list(loc: PaneLocation, signal: AbortSignal): Promise<Listing> {
+  async list(loc: PaneLocation, signal: AbortSignal, options?: ListOptions): Promise<Listing> {
     const dir = loc.path || path.parse(process.cwd()).root;
     const dirents = await fs.readdir(dir, { withFileTypes: true });
     signal.throwIfAborted();
 
-    const limit = this.pageSize();
+    const limit = options?.all ? Infinity : this.pageSize();
     const entries: Entry<LocalRef>[] = [];
     let bytes = 0;
 
@@ -145,6 +145,24 @@ export class LocalProvider implements PaneProvider {
   async rename(_loc: PaneLocation, entry: Entry, newName: string): Promise<void> {
     const ref = entry.ref as LocalRef;
     await fs.rename(ref.fullPath, path.join(path.dirname(ref.fullPath), newName));
+  }
+
+  async folder(loc: PaneLocation, name: string): Promise<{ location: PaneLocation; created: boolean }> {
+    const location = { ...loc, path: path.join(loc.path, name) };
+    try {
+      await fs.mkdir(location.path);
+      return { location, created: true };
+    } catch (err) {
+      const exists = (err as NodeJS.ErrnoException).code === 'EEXIST'
+        && (await fs.stat(location.path)).isDirectory();
+      if (!exists) throw err;
+      return { location, created: false };
+    }
+  }
+
+  /** Windows keeps the case it is given but finds a file by any case. */
+  nameKey(_loc: PaneLocation, name: string): string {
+    return process.platform === 'win32' || process.platform === 'darwin' ? name.toLowerCase() : name;
   }
 
   async create(loc: PaneLocation, name: string): Promise<string> {

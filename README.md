@@ -48,10 +48,13 @@ src/
 │  ├─ cursorHistory.ts     Which row the cursor was on, per listing
 │  ├─ ebcdic.ts            Local EBCDIC decoding for Shift+F3
 │  ├─ transferQueue.ts     Background queue for F5: streams source into target, with cancellation
+│  ├─ treeCopy.ts          Turns F5 on folders into folders made and files queued
 │  ├─ spool.ts             Temporary file for uploads that must be checked before they are sent
 │  ├─ editorBridge.ts      FileSystemProvider, so F3/F4 open in a real editor
 │  ├─ text.ts              Text/binary choice and LRECL fitting, whole or streamed
 │  ├─ settings.ts          Typed reading of the mc.* settings
+│  ├─ log.ts               The Output channel, filtered by mc.log.level
+│  ├─ trace.ts             Debug tracing of provider calls and their z/OSMF requests
 │  └─ errors.ts            Digs the readable sentence out of z/OSMF errors
 ├─ providers/
 │  ├─ localProvider.ts     Local disk
@@ -93,6 +96,17 @@ special case, just `source.readTo()` streaming into `target.writeFrom()`.
   the fitted records are spooled to a temporary file and sent only once all of
   them fit. A local target is written beside the real name and renamed at the
   end, so a failed copy never leaves half a file behind.
+- **A folder is whatever holds files.** F5 on a directory, a PDS or a job
+  walks it and copies what is inside, so the same key copies a PDS to another
+  LPAR, a job's spool to a folder on disk, or a folder of JCL into a new PDS.
+  The walk happens before anything is queued: folders are made at the target
+  first — a PDS allocated with the original's organisation, record format,
+  length, block size and space, or, for a directory, as an FB 80 PDS/E sized
+  for its files — so each transfer only ever writes a file into a place that
+  exists. What cannot be copied is left out with a reason and the rest goes
+  ahead: a folder inside a PDS, a load library (z/OSMF moves records, not load
+  modules), two files that would become the same member, and anything that
+  would be copied onto or into itself.
 - **JES is a file system.** Jobs are folders, spool DDs are files. That is why
   F3/F5/F8 mean the same thing there as everywhere else, without a separate
   command palette just for jobs.
@@ -191,7 +205,8 @@ against a real LPAR through z/OSMF. Still missing:
 
 - [x] Run against a real LPAR
 - [x] Streaming for large transfers
-- [ ] Recursive copying of directories and PDSes
+- [x] Recursive copying of directories, PDSes and jobs
+- [ ] Moving folders (F5 copies them; a move of a folder is refused)
 - [ ] `Alt+F7` search
 - [ ] TSO and console commands on the command line
 - [ ] Recall of migrated data sets (shown, and the `HRECALL` named, but not issued)

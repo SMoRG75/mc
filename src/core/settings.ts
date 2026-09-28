@@ -1,7 +1,9 @@
 import * as os from 'node:os';
 import * as vscode from 'vscode';
-import type {
-  FavouriteDto, PaneId, PaneKind, PaneLocation, TransferOptions,
+import type { LogLevel } from './log';
+import {
+  sameLocation,
+  type FavouriteDto, type PaneId, type PaneKind, type PaneLocation, type TransferOptions,
 } from '../shared/protocol';
 
 /**
@@ -50,6 +52,7 @@ export const settings = {
   dsDefaultFilter: (): string => settings.get('ds.defaultFilter', ''),
   jesRefreshSeconds: (): number => settings.get('jes.autoRefreshSeconds', 10),
   ebcdicRecordLength: (): number => settings.get('view.ebcdicRecordLength', 80),
+  logLevel: (): LogLevel => settings.get('log.level', 'info'),
 
   /** What Shift+F3 decodes with — the transfer codepage unless one is set here. */
   ebcdicCodepage: (): string => (
@@ -118,9 +121,8 @@ export const settings = {
   },
 };
 
-export function sameLocation(a: PaneLocation, b: PaneLocation): boolean {
-  return a.kind === b.kind && a.profile === b.profile && a.path === b.path;
-}
+// Lives with the protocol so code that must not load `vscode` can use it too.
+export { sameLocation };
 
 /**
  * Which settings scope a value written from the UI belongs in: whichever one

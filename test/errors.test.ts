@@ -43,3 +43,36 @@ test('falling back through the layers, and never to nothing', () => {
   assert.equal(describeError('a string').message, 'a string');
   assert.equal(describeError(null).message, 'null');
 });
+
+test('a TSO address space stuck at a prompt is explained, wherever it surfaces', () => {
+  // What z/OSMF answers a USS listing with when its TSO address space is
+  // waiting at a prompt — nothing in it says what to do.
+  const zosmf = {
+    message: 'Rest API failure with HTTP(S) status 500',
+    errorCode: 500,
+    mDetails: {
+      causeErrors: JSON.stringify({
+        category: 9, rc: 8, reason: 0,
+        message: 'ServletDispatcher failed - received TSO Prompt when expecting TSO_SERVLET_DISPATCHER_READY',
+      }),
+    },
+  };
+  const { message, detail } = describeError(zosmf);
+  assert.match(message, /TSO address space .* stuck at a prompt/);
+  assert.match(detail ?? '', /wait a few minutes and press F2/);
+  assert.match(detail ?? '', /received TSO Prompt/, 'the original is kept for whoever has to look into it');
+});
+
+test('a TSO address space that does not answer is named, so an operator can find it', () => {
+  const { message, detail } = describeError({
+    message: 'receiveResponseHeader: timeout receiving response (>30 secs): '
+      + 'TsoServerConnection(USER=Z29016, ASID=0x00df, QID=0x0033002c)',
+  });
+  assert.equal(message, "z/OSMF’s TSO address space for Z29016 (ASID X'00DF') is not answering.");
+  assert.match(detail ?? '', /SDSF DA, the address space with ASID 00DF/);
+});
+
+test('a plain timeout is not mistaken for a stuck TSO address space', () => {
+  assert.equal(describeError({ message: 'timeout receiving response from host' }).message,
+    'timeout receiving response from host');
+});

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import type { PaneLocation, TransferOptions } from '../shared/protocol';
 import type { ProviderRegistry } from './provider';
 import { describeError } from './errors';
+import { log } from './log';
 import { ebcdicToText } from './ebcdic';
 
 export const SCHEME_EDIT = 'mc';
@@ -181,6 +182,7 @@ interface QueryShape {
 
 function toFileSystemError(err: unknown, uri: vscode.Uri): Error {
   if (err instanceof vscode.FileSystemError) return err;
-  const { message } = describeError(err);
+  const { message, detail } = describeError(err);
+  log.error(`${uri.path}: ${message}`, detail);
   return vscode.FileSystemError.Unavailable(`${uri.path}: ${message}`);
 }

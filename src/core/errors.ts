@@ -22,6 +22,49 @@ export function describeError(err: unknown): { message: string; detail?: string 
   if (err instanceof UserFacingError) {
     return { message: err.message, detail: err.detail };
   }
+  const described = describeRaw(err);
+  return tsoTrouble(described) ?? described;
+}
+
+/**
+ * z/OSMF runs its file services in a TSO address space of the user's own. When
+ * that address space stops — at a prompt, or by not answering at all — every
+ * request that needs it fails, a USS listing as much as a data set one, however
+ * unrelated the request is to what caused it. z/OSMF's messages name its own
+ * internals and nothing the user can do, so they are replaced with what is
+ * going on and who can clear it; the original stays at the bottom.
+ */
+function tsoTrouble(described: { message: string; detail?: string }): { message: string; detail: string } | undefined {
+  const original = [described.message, described.detail].filter(Boolean).join('\n');
+  const prompt = /TSO Prompt when expecting/i.test(original);
+  const silent = /timeout receiving response[\s\S]*TsoServerConnection/i.test(original);
+  if (!prompt && !silent) return undefined;
+
+  // TsoServerConnection(USER=Z29016, ASID=0x00df, ...) says exactly which one.
+  const user = /USER=([A-Z0-9$#@]+)/i.exec(original)?.[1]?.toUpperCase();
+  const asid = /ASID=0x([0-9a-f]+)/i.exec(original)?.[1]?.toUpperCase().padStart(4, '0');
+  const which = user && asid ? ` for ${user} (ASID X'${asid}')` : ' for your user';
+
+  return {
+    message: prompt
+      ? `z/OSMF’s TSO address space${which} is stuck at a prompt.`
+      : `z/OSMF’s TSO address space${which} is not answering.`,
+    detail: 'The request itself is not the problem — z/OSMF runs file services in a TSO '
+      + 'address space, and that one has stopped. Usually an earlier request made TSO ask '
+      + 'something nobody can answer, such as DFSMShsm asking whether to recall a migrated '
+      + 'data set, and it then answers nothing else either.\n\n'
+      + 'z/OSMF ends it after its own timeout, and the next request gets a new one: wait a '
+      + 'few minutes and press F2. Sooner than that, an operator can cancel it'
+      + (asid ? ` — in SDSF DA, the address space with ASID ${asid}` : '')
+      + '.\n\n'
+      + 'If it comes back every time, the logon procedure z/OSMF starts TSO with (IZUFPROC '
+      + 'unless changed) or your TSO profile prompts on every logon — a missing account '
+      + 'number, for instance — and a system programmer has to look at it.\n\n'
+      + original,
+  };
+}
+
+function describeRaw(err: unknown): { message: string; detail?: string } {
   if (typeof err === 'object' && err !== null) {
     const e = err as ImperativeLike;
     const cause = parseCause(e.mDetails?.causeErrors);

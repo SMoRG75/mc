@@ -245,13 +245,13 @@ function describeLocation(location: PaneLocation): string {
  * until much later.
  */
 export function transferDialog(
-  defaults: TransferOptions, codepages: string[], count: number,
+  defaults: TransferOptions, codepages: string[], what: string,
   targetLabel: string, targetPath: string,
 ): Promise<TransferOptions | undefined> {
   return modal<TransferOptions>((resolve) => {
     const box = document.createElement('form');
     box.innerHTML = `
-      <div class="mh">Copy ${count} ${count === 1 ? 'file' : 'files'} to ${escapeHtml(targetLabel)}<span>F5</span></div>
+      <div class="mh">Copy ${escapeHtml(what)} to ${escapeHtml(targetLabel)}<span>F5</span></div>
       <div class="mb">
         <label class="row"><span>Destination</span>
           <input class="field" name="destination" spellcheck="false"></label>

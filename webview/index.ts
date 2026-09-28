@@ -299,7 +299,7 @@ class App {
         const options = action === 'copyNoDialog'
           ? this.defaults
           : await transferDialog(
-            this.defaults, this.codepages, ids.length,
+            this.defaults, this.codepages, describeSelection(pane.selection),
             target?.profile || 'local disk', target?.kind === 'ds' ? target.path : '',
           );
         if (!options) return;
@@ -511,6 +511,16 @@ function isDatasetFilter(path: string): boolean {
 function highLevelQualifier(filter: string): string {
   const stem = filter.replace(/\.?[*%][^.]*$/, '').replace(/\.$/, '');
   return stem ? `'${stem}.` : '';
+}
+
+/** `1 file`, `3 folders`, `2 folders and 5 files`. */
+function describeSelection(entries: EntryDto[]): string {
+  const folders = entries.filter((entry) => entry.kind === 'dir').length;
+  const files = entries.length - folders;
+  const count = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+  if (folders === 0) return count(files, 'file');
+  if (files === 0) return count(folders, 'folder');
+  return `${count(folders, 'folder')} and ${count(files, 'file')}`;
 }
 
 /** 1,234 B, 12.3 MB — binary units, as the transfer is measured in them. */

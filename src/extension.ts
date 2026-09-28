@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { CommanderPanel } from './commanderPanel';
 import { ProviderRegistry } from './core/provider';
 import { EditorBridge } from './core/editorBridge';
+import { log } from './core/log';
 import { settings } from './core/settings';
 import { SessionManager } from './zowe/sessions';
 import { LocalProvider } from './providers/localProvider';
@@ -10,6 +11,13 @@ import { UssProvider } from './providers/ussProvider';
 import { JesProvider } from './providers/jesProvider';
 
 export function activate(context: vscode.ExtensionContext): void {
+  // Its own entry in the Output panel's list. How much goes into it is
+  // `mc.log.level`, read on every line, so changing it takes effect at once.
+  const channel = vscode.window.createOutputChannel('Mainframe Commander');
+  log.configure(channel, settings.logLevel);
+  const version = (context.extension.packageJSON as { version?: string }).version ?? '?';
+  log.info(`Mainframe Commander ${version} on VS Code ${vscode.version}, Node ${process.versions.node}`);
+
   const sessions = new SessionManager();
 
   const providers = new ProviderRegistry();
@@ -31,6 +39,8 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   context.subscriptions.push(
+    channel,
+    vscode.commands.registerCommand('mc.showLog', () => channel.show(true)),
     // Saving a member from an editor changes what the pane behind it is showing.
     bridge.onDidWrite((location) => CommanderPanel.locationChanged(location)),
     vscode.commands.registerCommand('mc.open', () => {

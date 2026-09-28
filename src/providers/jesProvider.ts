@@ -217,10 +217,14 @@ export class JesProvider implements PaneProvider {
   describe(_loc: PaneLocation, entry: Entry): SourceItem {
     const ref = entry.ref as JesRef;
     return ref.kind === 'spool'
-      // Spool output lands next door as a plain text file, named so it stays sortable.
+      // Spool output lands next door as a plain text file. The spool id is in
+      // the name because the DD name alone is not unique — every step has its
+      // SYSPRINT — and padded so the files sort in the order the job wrote them.
       // The size column is a record count, so it is no measure of the bytes.
-      ? { name: `${ref.jobid}.${ref.ddname}.txt`, text: true }
-      : { name: `${ref.jobid}.jcl`, text: true };
+      ? { name: `${ref.jobid}.${String(ref.spoolId).padStart(3, '0')}.${ref.ddname}.txt`, text: true }
+      // A job is a folder of its spool files, and a copy of it is named the way
+      // SDSF shows it.
+      : { name: `${ref.jobname}.${ref.jobid}`, text: true };
   }
 
   async read(loc: PaneLocation, entry: Entry, options: TransferOptions): Promise<Buffer> {

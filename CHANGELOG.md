@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.11.0 — 2026-09-28
+
+- `F5` copies folders. A directory, a PDS or a job is copied with everything
+  in it, empty folders included: to another LPAR, between USS and local disk,
+  or from a folder of files into a new PDS. A PDS is allocated like the
+  original — organisation, record format, length, block size and space — and a
+  directory going to MVS becomes an FB 80 PDS/E, sized for its files, named the
+  way TSO reads an unquoted name. A job becomes a folder of its spool files.
+- Copying into a folder that is already there merges into it, and the
+  overwrite question offers *Overwrite All* and *Skip All* when more than one
+  thing is being copied.
+- What a copy has to leave out is listed with the reason, and the rest still
+  goes: a folder that would go inside a PDS, a load library, two files that
+  would become the same member (`a.jcl` and `a.txt` are both `A`).
+- A file can no longer be copied onto itself. With both panes in the same
+  place, *Overwrite* would have read and rewritten the same file at once.
+- Spool files are named with their spool id, `JOB01234.004.SYSPRINT.txt`: the
+  DD name alone repeats in every step, and copying several spool files of one
+  job made them overwrite each other.
+- The copy dialog says what it is about to copy — `2 folders and 5 files`.
+- A pane showing where a copy is going re-lists a few times a second at most,
+  not once per finished file.
+- A log of its own in the Output panel, *Mainframe Commander* (also *Mainframe
+  Commander: Show Log*). `mc.log.level` decides how much goes in: errors with
+  their full z/OSMF detail by default, each transfer and which host each
+  profile connects to at `info`, and at `debug` every pane operation and every
+  z/OSMF request with its status and time. Headers are never written, so
+  neither are passwords or tokens.
+- When z/OSMF's TSO address space for the user is stuck at a prompt or not
+  answering, the message says so — naming the address space, so an operator
+  can cancel it — instead of repeating z/OSMF's `TSO_SERVLET_DISPATCHER_READY`
+  or `TsoServerConnection` text. It shows up in any world, USS included,
+  because z/OSMF runs all its file services there.
+
 ## 0.10.0 — 2026-09-28
 
 - Transfers stream. `F5` and `F6` no longer read the whole source into memory

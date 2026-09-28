@@ -7,9 +7,11 @@ import {
 } from './shared/protocol';
 import type { Entry, PaneProvider, ProviderRegistry } from './core/provider';
 import { TransferQueue, type TransferRequest } from './core/transferQueue';
+import { planCopy, type ConflictAnswer } from './core/treeCopy';
 import { EditorBridge, type OpenMode } from './core/editorBridge';
 import { CursorHistory } from './core/cursorHistory';
 import { describeError, UserFacingError } from './core/errors';
+import { log } from './core/log';
 import {
   asRememberedPanes, sameLocation, settings,
   type RememberedPane, type RememberedPanes,
@@ -26,6 +28,9 @@ const VIEW_TYPE = 'mainframeCommander';
  * which is a different kind of thing and belongs in a memento.
  */
 const REMEMBERED_PANES = 'panes.last';
+
+/** How often, at most, finished transfers make a pane list itself again. */
+const REFRESH_MS = 300;
 
 interface PaneState {
   location: PaneLocation;
@@ -70,6 +75,8 @@ export class CommanderPanel {
   private jesTimer?: NodeJS.Timeout;
   /** The last state written, so a JES pane refreshing itself does not rewrite it. */
   private remembered = '';
+  /** Pending re-listings, so a copy of 500 files does not list the pane 500 times. */
+  private readonly refreshTimers: Partial<Record<PaneId, NodeJS.Timeout>> = {};
   /**
    * How many things the user is waiting for. A count rather than a flag: F5 on
    * top of a listing that is still running is two, and the pointer goes back to
@@ -185,6 +192,7 @@ export class CommanderPanel {
   private dispose(): void {
     CommanderPanel.current = undefined;
     if (this.jesTimer) clearInterval(this.jesTimer);
+    for (const timer of Object.values(this.refreshTimers)) clearTimeout(timer);
     this.queue.cancelAll();
     for (const d of this.disposables) d.dispose();
   }
@@ -519,35 +527,51 @@ export class CommanderPanel {
       });
     });
 
-    const requests: TransferRequest[] = [];
-    for (const id of entryIds) {
-      const entry = this.entry(from, id);
-      if (entry.dto.kind === 'dir') {
-        // Recursive copy is a roadmap item; failing loudly beats copying half a tree.
-        this.post({
-          type: 'error', pane: from,
-          message: `'${entry.dto.name}' is a folder — recursive copy is not implemented yet.`,
-        });
-        continue;
-      }
-      const name = applyPattern(options.destination, source.describe(sourceLoc, entry).name);
-      if (options.onConflict !== 'overwrite' && await target.exists(targetLoc, name)) {
-        if (options.onConflict === 'skip') continue;
-        const answer = await vscode.window.showWarningMessage(
-          `${name} already exists in ${target.label(targetLoc)}.`,
-          { modal: true }, 'Overwrite', 'Skip',
-        );
-        if (answer !== 'Overwrite') continue;
-      }
-      requests.push({ source, sourceLoc, target, targetLoc, entry, name, options, move });
+    const plan = await planCopy({
+      source, sourceLoc, target, targetLoc,
+      entries: entryIds.map((id) => this.entry(from, id)),
+      options, move,
+      ask: (name, where, many) => askConflict(name, target.label(where), many),
+      signal: new AbortController().signal,
+    });
+    if (plan.problems.length > 0) {
+      const count = plan.problems.length;
+      this.post({
+        type: 'error', pane: from,
+        message: `${count} item${count === 1 ? ' was' : 's were'} left out of the copy.`,
+        detail: plan.problems.join('\n'),
+      });
     }
-    this.queue.enqueue(requests);
+    // The new folders are there already; the files arrive as the queue runs.
+    if (plan.foldersMade > 0) this.refreshSoon(to);
+    this.queue.enqueue(plan.requests);
   }
 
+  /**
+   * Re-lists the panes a finished transfer touched. By location rather than by
+   * pane: a file copied three folders down changes nothing either pane shows,
+   * unless one of them is standing in that folder.
+   */
   private onTransferFinished(job: TransferRequest): void {
-    const target: PaneId = this.panes.left.location === job.targetLoc ? 'left' : 'right';
-    void this.refresh(target);
-    if (job.move) void this.refresh(target === 'left' ? 'right' : 'left');
+    for (const pane of ['left', 'right'] as PaneId[]) {
+      const here = this.panes[pane].location;
+      if (sameLocation(here, job.targetLoc) || (job.move && sameLocation(here, job.sourceLoc))) {
+        this.refreshSoon(pane);
+      }
+    }
+  }
+
+  /**
+   * Lists `pane` again shortly, once for however many asked in the meantime.
+   * A pending one is left to run rather than pushed back: a long copy of small
+   * files would otherwise keep the pane unchanged until the very end.
+   */
+  private refreshSoon(pane: PaneId): void {
+    if (this.refreshTimers[pane]) return;
+    this.refreshTimers[pane] = setTimeout(() => {
+      this.refreshTimers[pane] = undefined;
+      void this.refresh(pane);
+    }, REFRESH_MS);
   }
 
   private async remove(pane: PaneId, entryIds: string[]): Promise<void> {
@@ -674,6 +698,9 @@ export class CommanderPanel {
   }
 
   private post(message: HostMessage): void {
+    // Everything the user is told went wrong, with the detail the status bar
+    // only shows on hover — the log is where it is still there afterwards.
+    if (message.type === 'error') log.error(message.message, message.detail);
     void this.panel.webview.postMessage(message);
   }
 
@@ -701,10 +728,23 @@ export class CommanderPanel {
 }
 
 
-/** `*` keeps the source name; anything else is used verbatim. */
-function applyPattern(pattern: string, sourceName: string): string {
-  if (!pattern || pattern === '*') return sourceName;
-  return pattern.replace(/\*/g, sourceName);
+/**
+ * The overwrite question. With more than one thing being copied, it also
+ * offers to answer for the rest — a folder of 200 files that are mostly there
+ * already is otherwise 200 dialogs.
+ */
+async function askConflict(name: string, where: string, many: boolean): Promise<ConflictAnswer | undefined> {
+  const choices = many ? ['Overwrite', 'Skip', 'Overwrite All', 'Skip All'] : ['Overwrite', 'Skip'];
+  const answer = await vscode.window.showWarningMessage(
+    `${name} already exists in ${where}.`, { modal: true }, ...choices,
+  );
+  switch (answer) {
+    case 'Overwrite': return { answer: 'overwrite', all: false };
+    case 'Skip': return { answer: 'skip', all: false };
+    case 'Overwrite All': return { answer: 'overwrite', all: true };
+    case 'Skip All': return { answer: 'skip', all: true };
+    default: return undefined;
+  }
 }
 
 /**

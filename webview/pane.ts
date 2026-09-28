@@ -340,6 +340,12 @@ export class Pane {
     return this.view[this.list.cursorIndex];
   }
 
+  /** The rows `selectionIds` names, for saying what is about to be acted on. */
+  get selection(): EntryDto[] {
+    const ids = new Set(this.selectionIds);
+    return (this.listing?.entries ?? []).filter((entry) => ids.has(entry.id));
+  }
+
   /** Marked rows, or the row under the cursor when nothing is marked. */
   get selectionIds(): string[] {
     if (this.marked.size > 0) return [...this.marked];

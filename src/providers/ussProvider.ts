@@ -2,9 +2,10 @@ import type { Readable, Writable } from 'node:stream';
 import { Create, Delete, Download, Get, List, Upload, Utilities } from '@zowe/zos-files-for-zowe-sdk';
 import type { AbstractSession } from '@zowe/imperative';
 import type { Capabilities, ColumnDef, PaneLocation, TransferOptions } from '../shared/protocol';
-import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
+import type { Entry, Listing, ListOptions, PaneProvider, SourceItem } from '../core/provider';
 import type { SessionManager } from '../zowe/sessions';
 import { pacedDownload, pacedUpload } from '../zowe/flow';
+import { UserFacingError } from '../core/errors';
 import { resolveMode } from '../core/text';
 
 interface UssRef { path: string; isDirectory: boolean }
@@ -33,14 +34,14 @@ export class UssProvider implements PaneProvider {
     return { write: true, delete: true, rename: true, create: true, submit: true };
   }
 
-  async list(loc: PaneLocation, signal: AbortSignal): Promise<Listing> {
+  async list(loc: PaneLocation, signal: AbortSignal, options?: ListOptions): Promise<Listing> {
     const session = await this.sessions.session(loc.profile);
     const dir = loc.path || '/';
     const response = await List.fileList(session, dir, {});
     signal.throwIfAborted();
 
     const items = (response.apiResponse?.items ?? []) as ZosmfUssItem[];
-    const limit = this.settings.pageSize();
+    const limit = options?.all ? Infinity : this.settings.pageSize();
     let bytes = 0;
 
     const entries: Entry<UssRef>[] = items
@@ -178,6 +179,18 @@ export class UssProvider implements PaneProvider {
     const session = await this.sessions.session(loc.profile);
     const ref = entry.ref as UssRef;
     await Utilities.renameUSSFile(session, ref.path, join(dirname(ref.path), newName));
+  }
+
+  async folder(loc: PaneLocation, name: string): Promise<{ location: PaneLocation; created: boolean }> {
+    const session = await this.sessions.session(loc.profile);
+    const location = { ...loc, path: join(loc.path || '/', name) };
+    const response = await List.fileList(session, loc.path || '/', {});
+    const there = ((response.apiResponse?.items ?? []) as ZosmfUssItem[]).find((item) => item.name === name);
+    if (there && !there.mode?.startsWith('d')) {
+      throw new UserFacingError(`'${location.path}' exists, and it is a file, not a directory.`);
+    }
+    if (!there) await Create.uss(session, location.path, 'directory');
+    return { location, created: !there };
   }
 
   /** F7 makes a directory; a trailing name without '/' still means a directory here. */

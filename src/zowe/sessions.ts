@@ -1,6 +1,7 @@
 import { ProfileInfo, type AbstractSession, type IProfArgAttrs, type IProfAttrs } from '@zowe/imperative';
 import type { ProfileDto } from '../shared/protocol';
 import { UserFacingError } from '../core/errors';
+import { log } from '../core/log';
 
 /**
  * Owns the connection to z/OS.
@@ -17,6 +18,7 @@ export class SessionManager {
 
   /** Re-reads zowe.config.json; call when the user edits their profiles. */
   invalidate(): void {
+    log.debug('Zowe configuration changed; profiles will be read again.');
     this.info = undefined;
     this.sessions.clear();
   }
@@ -68,6 +70,11 @@ export class SessionManager {
     assertHasCredentials(merged.knownArgs, attrs.profName);
     const session = ProfileInfo.createSession(merged.knownArgs);
     this.sessions.set(profileName, session);
+    const s = session.ISession;
+    // Where, and as whom — never with what: the password and token stay out.
+    log.info(`Profile '${attrs.profName}': ${s.protocol ?? 'https'}://${s.hostname}:${s.port}`
+      + `${s.basePath ?? ''} as ${s.user ?? '(certificate or token)'}, ${s.type ?? 'basic'} auth`
+      + `${s.rejectUnauthorized === false ? ', certificates not checked' : ''}`);
     return session;
   }
 

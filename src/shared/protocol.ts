@@ -279,3 +279,8 @@ export type ClientMessage =
 export function reportsProgress(type: ClientMessage['type']): boolean {
   return type !== 'cursor';
 }
+
+/** Two locations are the same place when they agree on world, profile and path. */
+export function sameLocation(a: PaneLocation, b: PaneLocation): boolean {
+  return a.kind === b.kind && a.profile === b.profile && a.path === b.path;
+}

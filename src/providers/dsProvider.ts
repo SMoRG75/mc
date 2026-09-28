@@ -7,9 +7,10 @@ import type { AbstractSession } from '@zowe/imperative';
 import type {
   Capabilities, ColumnDef, DatasetSpec, PaneLocation, TransferOptions,
 } from '../shared/protocol';
-import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
+import type { Entry, FolderShape, Listing, ListOptions, PaneProvider, SourceItem } from '../core/provider';
 import type { SessionManager } from '../zowe/sessions';
 import { describeError, UserFacingError } from '../core/errors';
+import { log } from '../core/log';
 import { spooled } from '../core/spool';
 import { fitToRecordLength, RecordFitter, resolveMode } from '../core/text';
 import { pacedDownload, pacedUpload } from '../zowe/flow';
@@ -23,7 +24,11 @@ export interface DsSettings {
 
 /** A pane on MVS datasets: a filter listing at the top level, members inside a PDS. */
 type DsRef =
-  | { kind: 'dataset'; dsname: string; dsorg?: string; recfm?: string; lrecl?: string; migrated: boolean }
+  | {
+    kind: 'dataset'; dsname: string; dsorg?: string; recfm?: string; lrecl?: string; migrated: boolean;
+    /** What a copy of it on another system is allocated from. */
+    blksz?: string; spacu?: string; sizex?: string;
+  }
   | { kind: 'member'; dsname: string; member: string; lrecl?: string };
 
 const DATASET_COLUMNS: ColumnDef[] = [
@@ -74,12 +79,13 @@ export class DsProvider implements PaneProvider {
     return { write: true, delete: true, rename: true, create: true, submit: true };
   }
 
-  async list(loc: PaneLocation, signal: AbortSignal): Promise<Listing> {
+  async list(loc: PaneLocation, signal: AbortSignal, options?: ListOptions): Promise<Listing> {
     const session = await this.sessions.session(loc.profile);
     signal.throwIfAborted();
+    const limit = options?.all ? Infinity : this.settings.pageSize();
     return isFilter(loc.path)
-      ? this.listDataSets(session, loc.path || this.defaultFilter(session), signal)
-      : this.listMembers(session, loc.path, signal);
+      ? this.listDataSets(session, loc.path || this.defaultFilter(session), limit, signal)
+      : this.listMembers(session, loc.path, limit, signal);
   }
 
   /**
@@ -97,11 +103,12 @@ export class DsProvider implements PaneProvider {
     return user ? `${user.toUpperCase()}.*` : '*';
   }
 
-  private async listDataSets(session: AbstractSession, filter: string, signal: AbortSignal): Promise<Listing> {
+  private async listDataSets(
+    session: AbstractSession, filter: string, limit: number, signal: AbortSignal,
+  ): Promise<Listing> {
     const { response, withAttributes } = await this.listWithAttributeFallback(session, filter);
     signal.throwIfAborted();
     const items = (response.apiResponse?.items ?? []) as ZosmfDataSet[];
-    const limit = this.settings.pageSize();
 
     const entries: Entry<DsRef>[] = items.slice(0, limit).map((item) => {
       const migrated = item.migr === 'YES' || item.vol === 'MIGRAT';
@@ -109,6 +116,7 @@ export class DsProvider implements PaneProvider {
         ref: {
           kind: 'dataset', dsname: item.dsname, dsorg: item.dsorg,
           recfm: item.recfm, lrecl: item.lrecl, migrated,
+          blksz: item.blksz, spacu: item.spacu, sizex: item.sizex,
         },
         dto: {
           id: item.dsname,
@@ -158,6 +166,10 @@ export class DsProvider implements PaneProvider {
     try {
       return { response: await List.dataSet(session, filter, { attributes: true }), withAttributes: true };
     } catch (rich) {
+      // Worth keeping even when the fallback works: the TSO services failing
+      // here are the ones everything else then trips over.
+      const { message, detail } = describeError(rich);
+      log.warn(`Listing '${filter}' with attributes failed; listing it without them: ${message}`, detail);
       try {
         return { response: await List.dataSet(session, filter, {}), withAttributes: false };
       } catch {
@@ -166,7 +178,9 @@ export class DsProvider implements PaneProvider {
     }
   }
 
-  private async listMembers(session: AbstractSession, dsname: string, signal: AbortSignal): Promise<Listing> {
+  private async listMembers(
+    session: AbstractSession, dsname: string, limit: number, signal: AbortSignal,
+  ): Promise<Listing> {
     const [members, attributes] = await Promise.all([
       List.allMembers(session, dsname, { attributes: true }),
       this.attributes(session, dsname).catch(() => undefined),
@@ -174,7 +188,6 @@ export class DsProvider implements PaneProvider {
     signal.throwIfAborted();
 
     const items = (members.apiResponse?.items ?? []) as ZosmfMember[];
-    const limit = this.settings.pageSize();
     const load = isLoadLibrary(attributes?.recfm, items);
 
     const entries: Entry<DsRef>[] = items.slice(0, limit).map((item) => ({
@@ -234,7 +247,9 @@ export class DsProvider implements PaneProvider {
     // Datasets hold records, not bytes: they are always text unless the user
     // says otherwise, and the size column — a record count, or a load module's
     // length — says nothing about how many bytes a transfer will move.
-    return { name: ref.kind === 'member' ? ref.member : ref.dsname, text: true };
+    return ref.kind === 'member'
+      ? { name: ref.member, text: true }
+      : { name: ref.dsname, text: true, dataset: isPartitioned(ref.dsorg) ? shapeOf(ref) : undefined };
   }
 
   recordLength(_loc: PaneLocation, entry: Entry): number | undefined {
@@ -323,6 +338,63 @@ export class DsProvider implements PaneProvider {
   private async recordLengthFor(session: AbstractSession, loc: PaneLocation, name: string): Promise<number> {
     const attributes = await this.attributes(session, isFilter(loc.path) ? name : loc.path);
     return Number(attributes?.lrecl ?? 80) || 80;
+  }
+
+  /**
+   * A folder copied to the data set level becomes a PDS; inside one there is
+   * nowhere for it to go. A PDS being copied keeps its own name and shape,
+   * while a directory's name is read the way TSO reads an unquoted one — `jcl`
+   * becomes `IBMUSER.JCL` — and it gets the shape F7 gives source, sized for
+   * what is about to go into it.
+   */
+  async folder(
+    loc: PaneLocation, name: string, shape: FolderShape,
+  ): Promise<{ location: PaneLocation; created: boolean }> {
+    if (!isFilter(loc.path)) {
+      throw new UserFacingError(
+        `'${name}' cannot go inside ${loc.path}: a PDS holds members, not folders.`,
+        'Copy it at the data set level instead, where it becomes a PDS of its own.',
+      );
+    }
+    const session = await this.sessions.session(loc.profile);
+    const dsname = datasetName(shape.from === 'ds' ? `'${name}'` : name, userPrefix(session));
+    const location = { ...loc, path: dsname };
+
+    const existing = await this.attributes(session, dsname);
+    if (existing) {
+      if (!isPartitioned(existing.dsorg)) {
+        throw new UserFacingError(`${dsname} exists, and it is not a PDS.`);
+      }
+      return { location, created: false };
+    }
+
+    const given = shape.from === 'ds' ? shape.dataset : sourceShape(shape);
+    const spec = given && { ...given };
+    if (!spec) {
+      throw new UserFacingError(
+        `The attributes of ${name} are not known, so a copy of it cannot be allocated.`,
+        'The listing came back without them. Allocate the target with F7 and copy again: '
+        + 'members go into a PDS that is already there.',
+      );
+    }
+    if (spec.recfm.toUpperCase().startsWith('U')) {
+      throw new UserFacingError(
+        `${name} is a load library, which cannot be copied through z/OSMF.`,
+        'z/OSMF moves records, and a load module is more than its records. Use IEBCOPY on the host.',
+      );
+    }
+    if (spec.type === 'pds') {
+      // A directory block holds about six entries with ISPF statistics; the
+      // rest is room for the members the PDS will get after this copy.
+      spec.dirblk = Math.max(spec.dirblk ?? 0, 20, Math.ceil(shape.files / 5));
+    }
+    await Create.dataSet(session, typeOf(spec), dsname, attributesOf(spec));
+    return { location, created: true };
+  }
+
+  /** Inside a PDS, a name is the member it becomes. */
+  nameKey(loc: PaneLocation, name: string): string {
+    return isFilter(loc.path) ? name.toUpperCase() : memberName(name);
   }
 
   async exists(loc: PaneLocation, name: string): Promise<boolean> {
@@ -423,6 +495,46 @@ function explainListFailure(err: unknown, filter: string): UserFacingError {
 
 /** Half a 3390 track: the block size everyone has used since the 1990s. */
 const HALF_TRACK = 27998;
+
+/**
+ * A copy of a PDS, allocated the way the original is: same organisation,
+ * record format, record length and block size, and as much space as it has
+ * now — a copy that runs out halfway through is the failure worth avoiding.
+ * Undefined when the listing had no attributes to go on.
+ */
+function shapeOf(ref: Extract<DsRef, { kind: 'dataset' }>): DatasetSpec | undefined {
+  const lrecl = Number(ref.lrecl);
+  if (!ref.recfm || !(lrecl > 0)) return undefined;
+  // z/OSMF spells the unit out: TRACKS, CYLINDERS or BLOCKS. Only the first
+  // two say how big it is; a size in blocks is left to the default rather than
+  // guessed at.
+  const unit = /^CYL/i.test(ref.spacu ?? '') ? 'CYL' : 'TRK';
+  const size = /^(CYL|TRACK)/i.test(ref.spacu ?? '') ? Number(ref.sizex) : NaN;
+  const primary = size > 0 ? size : 10;
+  return {
+    type: ref.dsorg === 'PO-E' ? 'pdse' : 'pds',
+    recfm: ref.recfm,
+    lrecl,
+    blksize: Number(ref.blksz) || undefined,
+    alcunit: unit,
+    primary,
+    secondary: Math.max(1, Math.ceil(primary / 4)),
+  };
+}
+
+/**
+ * A PDS for a directory's files: FB 80 PDS/E, as F7 gives source, and room
+ * for them. A line of text becomes a record of 80 however short it was, so
+ * half a track's worth of bytes to a track is the estimate that does not run
+ * out — and a PDS/E gives back what it does not use.
+ */
+function sourceShape(shape: FolderShape): DatasetSpec {
+  const primary = Math.max(10, Math.ceil(shape.bytes / HALF_TRACK));
+  return {
+    type: 'pdse', recfm: 'FB', lrecl: 80, alcunit: 'TRK',
+    primary, secondary: Math.max(5, Math.ceil(primary / 2)),
+  };
+}
 
 function typeOf(spec: DatasetSpec | undefined): CreateDataSetTypeEnum {
   return spec?.type === 'seq'
@@ -602,6 +714,7 @@ function hex(value: string | undefined): number | undefined {
 interface ZosmfDataSet {
   dsname: string; dsorg?: string; recfm?: string; lrecl?: string;
   used?: string; vol?: string; migr?: string;
+  blksz?: string; spacu?: string; sizex?: string;
 }
 interface ZosmfMember {
   member: string;
