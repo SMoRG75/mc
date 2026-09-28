@@ -217,25 +217,25 @@ special case, just `source.readTo()` streaming into `target.writeFrom()`.
 
 ## Status
 
-All four providers are written against the Zowe v8 API and have been run
-against a real LPAR through z/OSMF.
+1.0. All four worlds — local disk, MVS, USS and JES — are written against the
+Zowe v8 API and tested against a real z/OSMF (IBM Z Xplore) with
+`npm run test:host`, alongside the unit tests for the parts that can lose data
+quietly: the EBCDIC tables, LRECL fitting, transfer-mode choice and error
+parsing.
 
-Done:
+Known limitations:
 
-- [x] Run against a real LPAR
-- [x] Streaming for large transfers
-- [x] Recursive copying of directories, PDSes and jobs
-- [x] `Alt+F7` search, by name and by text, in all four worlds
-- [x] Recall of migrated data sets, from Enter, F3, F4 or `recall` on the command line
-- [x] Unit tests for the parts that can lose data quietly — the EBCDIC
-      tables, LRECL fitting, transfer-mode choice and error parsing
-- [x] Tests for the providers against a host (`npm run test:host`): MVS,
-      USS and JES, run against IBM Z Xplore
-
-Before 1.0:
-
-- [ ] Recall tried against a host with DFSMShsm: Z Xplore has none for users,
-      so it is only tested against a fake z/OSMF
+- **Recall of migrated data sets has not been tried against a real
+  DFSMShsm.** Z Xplore has none for its users, so the recall — queued at HSM,
+  then checked on until the data set is back — is tested against a fake
+  z/OSMF only. Reports from a system with HSM are welcome.
+- A directory with many thousands of entries lists slowly on some systems:
+  z/OSMF builds a listing one entry at a time, about 30 ms each on Z Xplore,
+  and gives up after 30 seconds. A pane asks only for `mc.list.pageSize`
+  entries; lower it, or `cd` straight to where you are going.
+- Transfers run in parallel. Concurrent listings were shown to collide over
+  the user's ISPF profile and are sent one at a time; concurrent reads were
+  measured not to, concurrent writes have not been measured.
 
 Later, around 1.2:
 
@@ -244,6 +244,10 @@ Later, around 1.2:
       services over the user's ISPF profile the way two file requests did
       (`ISPT036`), so this needs trying against a host before it is designed.
 - [ ] Moving folders (F5 copies them; a move of a folder is refused)
+
+## Sponsor
+
+If Mainframe Commander saves you time: [github.com/sponsors/SMoRG75](https://github.com/sponsors/SMoRG75).
 
 ## License
 

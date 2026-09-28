@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.0.0 — 2026-09-28
+
+The first release with everything 0.9.0 listed under *Not yet* that belongs in
+1.0: streaming transfers, recursive copying, `Alt+F7` search, recall of
+migrated data sets, and tests of the providers against a real host. What
+changed on the way is in the 0.10.0 – 0.13.1 entries below; this release only
+adds a link to GitHub Sponsors on the extension's page — a Sponsor button in
+its header, and a line in the details.
+
+### Known limitations
+
+- Recall has not been tried against a real DFSMShsm. IBM Z Xplore, where the
+  host tests run, has none for its users, so the recall is tested against a
+  fake z/OSMF only.
+- Very large directories list slowly on some systems, since z/OSMF builds a
+  listing one entry at a time and gives up after 30 seconds; a pane asks for
+  no more than `mc.list.pageSize` entries.
+- Concurrent writes to the host have not been measured for collisions over the
+  user's ISPF profile, the way concurrent listings were.
+
+### Later
+
+- TSO and console commands on the command line, and moving folders — planned
+  for around 1.2.
+
 ## 0.13.1 — 2026-09-28
 
 - `F7` without the dialog — the command line — allocates in tracks, as the

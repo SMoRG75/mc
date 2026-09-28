@@ -68,9 +68,9 @@ test('a TSO timeout points at the request first, and names the address space for
   // five entries three. So the likelier story comes first.
   const { message, detail } = describeError({
     message: 'receiveResponseHeader: timeout receiving response (>30 secs): '
-      + 'TsoServerConnection(USER=Z29016, ASID=0x00df, QID=0x0033002c)',
+      + 'TsoServerConnection(USER=IBMUSER, ASID=0x00df, QID=0x0033002c)',
   });
-  assert.equal(message, "z/OSMF’s TSO address space for Z29016 (ASID X'00DF') did not answer within 30 seconds.");
+  assert.equal(message, "z/OSMF’s TSO address space for IBMUSER (ASID X'00DF') did not answer within 30 seconds.");
   assert.match(detail ?? '', /^Either the request was more than it could do/);
   assert.match(detail ?? '', /mc\.list\.pageSize/);
   assert.match(detail ?? '', /SDSF DA, the address space with ASID 00DF/);

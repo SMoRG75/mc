@@ -73,13 +73,13 @@ test('two profiles for one user on one host share the queue; another user does n
   const session = (user: string) => ({ ISession: { hostname: 'h', port: 443, user } }) as unknown as AbstractSession;
   const r = recorder();
   await Promise.all([
-    sessions.fileService(session('z29016'), r.call('a')),
-    sessions.fileService(session('Z29016'), r.call('b')),
+    sessions.fileService(session('ibmuser'), r.call('a')),
+    sessions.fileService(session('IBMUSER'), r.call('b')),
   ]);
   assert.equal(r.most(), 1, 'the ISPF profile is the user\'s, whatever the profile is called');
   const other = recorder();
   await Promise.all([
-    sessions.fileService(session('Z29016'), other.call('a')),
+    sessions.fileService(session('IBMUSER'), other.call('a')),
     sessions.fileService(session('Z11111'), other.call('b')),
   ]);
   assert.equal(other.most(), 2);

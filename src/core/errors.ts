@@ -40,7 +40,7 @@ function tsoTrouble(described: { message: string; detail?: string }): { message:
   const silent = /timeout receiving response[\s\S]*TsoServerConnection/i.test(original);
   if (!prompt && !silent) return undefined;
 
-  // TsoServerConnection(USER=Z29016, ASID=0x00df, ...) says exactly which one.
+  // TsoServerConnection(USER=IBMUSER, ASID=0x00df, ...) says exactly which one.
   const user = /USER=([A-Z0-9$#@]+)/i.exec(original)?.[1]?.toUpperCase();
   const asid = /ASID=0x([0-9a-f]+)/i.exec(original)?.[1]?.toUpperCase().padStart(4, '0');
   const which = user && asid ? ` for ${user} (ASID X'${asid}')` : ' for your user';
