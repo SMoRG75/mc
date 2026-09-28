@@ -98,9 +98,9 @@ export function writeNotices(metafile, outfile) {
   const header = [
     'Mainframe Commander — third-party notices',
     '',
-    'Mainframe Commander is Copyright © ubi.dk and released under EPL-2.0 (see',
-    'LICENSE). It includes the third-party software listed below, each under its',
-    'own license.',
+    'Mainframe Commander is Copyright © 2026 ubi.dk - Søren Andersen and',
+    'released under EPL-2.0 (see LICENSE). It includes the third-party software',
+    'listed below, each under its own license.',
     '',
   ].join('\n');
 
