@@ -22,6 +22,12 @@
      letter-spacing:.4px;text-transform:uppercase}
   h2 span{color:var(--accent2);font-weight:400;text-transform:none;letter-spacing:0;font-size:13px;margin-left:8px}
   .note{color:var(--fg-dim);font-size:13px;margin:-4px 0 14px;max-width:820px}
+  .historic{margin:-12px 0 28px;padding:10px 14px;max-width:820px;font-size:13px;
+            background:#33291d;border:1px solid #5a4a2d;border-left:3px solid var(--mark);
+            border-radius:4px;color:var(--fg)}
+  .historic b{color:var(--mark)}
+  .historic code{font-family:var(--mono);color:var(--mark);font-size:12px}
+  .historic a{color:var(--accent2)}
 
   /* ---------- VS Code shell ---------- */
   .vscode{border:1px solid var(--line);border-radius:6px;overflow:hidden;
@@ -142,6 +148,14 @@
 
   <h1>Mainframe Commander</h1>
   <p class="sub">Design sketch — Total Commander-style dual pane for z/OS in VS Code, powered by Zowe.</p>
+
+  <p class="historic">
+    <b>The sketch this project started from, in August 2026 — not a description of it.</b>
+    Mainframe Commander 1.0 differs in places: there is no <code>tso</code> or <code>console</code>
+    on the command line yet, the F5 dialog asks for no RECFM or LRECL, one F-key bar serves every
+    world, and there are four worlds rather than three. The
+    <a href="https://github.com/SMoRG75/mc#readme">README</a> says what it does.
+  </p>
 
   <h2>1 · The main view <span>editor webview, full width</span></h2>
   <p class="note">Left pane: PDS members on LPAR1. Right pane: USS directory on LPAR2.

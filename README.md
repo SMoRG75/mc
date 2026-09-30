@@ -5,7 +5,9 @@ The connection goes through [Zowe](https://www.zowe.org/), so the user's existin
 `zowe.config.json` — certificates, MFA and credential manager included — is the
 only setup required.
 
-The design sketch is in [`docs/mainframe-commander-mockup.html`](docs/mainframe-commander-mockup.html).
+The design sketch it started from is in
+[`docs/mainframe-commander-mockup.html`](docs/mainframe-commander-mockup.html) — kept as it
+was drawn, so it differs from 1.0 in places.
 
 ## Getting started
 
