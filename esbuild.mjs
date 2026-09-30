@@ -47,6 +47,9 @@ const webview = {
   platform: 'browser',
   target: 'es2022',
   format: 'esm',
+  // Images the stylesheet points at land next to it, under a hashed name that
+  // the url() in the built CSS is rewritten to.
+  loader: { '.png': 'file' },
 };
 
 if (watch) {

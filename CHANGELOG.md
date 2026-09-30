@@ -1,13 +1,18 @@
 # Changelog
 
-## 1.0.0 — 2026-09-28
+## 1.0.0 — 2026-09-30
 
 The first release with everything 0.9.0 listed under *Not yet* that belongs in
 1.0: streaming transfers, recursive copying, `Alt+F7` search, recall of
 migrated data sets, and tests of the providers against a real host. What
-changed on the way is in the 0.10.0 – 0.13.1 entries below; this release only
-adds a link to GitHub Sponsors on the extension's page — a Sponsor button in
-its header, and a line in the details.
+changed on the way is in the 0.10.0 – 0.13.1 entries below. New in this
+release itself:
+
+- A link to GitHub Sponsors on the extension's page — a Sponsor button in its
+  header, and a line in the details.
+- The ubi.dk logo at the foot of the left column in the F1 shortcuts.
+- F1 on a short window scrolls instead of pushing sections into a column off
+  to the right, where they could only be reached with a sideways scrollbar.
 
 ### Known limitations
 

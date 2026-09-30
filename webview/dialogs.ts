@@ -144,21 +144,29 @@ export function filterDialog(spec: FilterDto): Promise<Record<string, string> | 
  * the ones it cannot show. There is nothing to fill in: the Close button holds
  * the keyboard, so Enter and Space close it as readily as Escape does.
  */
+/**
+ * The ubi.dk logo, at the foot of the left column — the column the F-key bar
+ * starts the right-hand one after, which is what `break-after` in the CSS
+ * holds it to. The image itself is in the stylesheet, so esbuild ships it.
+ */
+const BRAND = '<div class="brand" role="img" aria-label="ubi.dk — doing smart things the easy way"></div>';
+
 export function helpDialog(): Promise<undefined> {
   return modal<undefined>((resolve) => {
     const box = document.createElement('div');
     box.className = 'help';
     box.innerHTML = `
       <div class="mh">Shortcuts<span>F1</span></div>
-      <div class="mb">
+      <div class="mb"><div class="cols">
         ${SHORTCUTS.map((section) => `
+          ${section.title === 'The F-key bar' ? BRAND : ''}
           <section>
             <h4>${escapeHtml(section.title)}</h4>
             <dl>${section.rows.map(([keys, what]) => `
               <dt>${escapeHtml(keys)}</dt><dd>${escapeHtml(what)}</dd>`).join('')}</dl>
             ${section.note ? `<p class="hint flush">${escapeHtml(section.note)}</p>` : ''}
           </section>`).join('')}
-      </div>
+      </div></div>
       <div class="mf">
         <button class="btn pri" data-close>Close</button>
       </div>`;

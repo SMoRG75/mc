@@ -12,6 +12,8 @@ tsconfig.json
 # The package is built in the repository root; it must not land inside the next one.
 *.vsix
 **/*.map
+# The logo as delivered; the panel uses the scaled copy built into dist/webview.
+images/ubidklogosmall.png
 **/*.ts
 # The credential manager is the only package left in node_modules. Its Rust
 # sources and install-time check are not needed at runtime; lib/index.js,

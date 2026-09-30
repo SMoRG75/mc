@@ -891,7 +891,8 @@ export class CommanderPanel {
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none';
-  style-src ${webview.cspSource}; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
+  style-src ${webview.cspSource}; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};
+  img-src ${webview.cspSource};">
 <link rel="stylesheet" href="${asset('style.css')}">
 <title>Mainframe Commander</title>
 </head>

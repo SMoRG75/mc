@@ -361,16 +361,23 @@ select.field option {
    the panel is short, and a list this long would otherwise be a page to page
    through rather than a card to glance at. */
 .modal.help { width: min(760px, 94vw); }
+/* Two elements, not one: a multi-column box with a height limit does not
+   scroll when the text is taller than that, it adds columns off to the side.
+   So the body scrolls, and the columns inside it take whatever height they need. */
 .modal.help .mb {
   display: block;
-  columns: 2;
-  column-gap: 26px;
   max-height: 70vh;
   overflow-y: auto;
+}
+.modal.help .cols {
+  columns: 2;
+  column-gap: 26px;
 }
 /* Column flow rather than a two-by-three grid: the sections are different
    heights, and a grid would line their tops up and leave the holes in between. */
 .modal.help section { break-inside: avoid; margin: 0 0 13px; }
+/* The last one ends the column: space below it is only something to scroll to. */
+.modal.help section:last-child { margin-bottom: 0; }
 .modal.help h4 {
   margin: 0 0 5px;
   color: var(--vscode-textLink-foreground);
@@ -397,9 +404,21 @@ select.field option {
 }
 .modal.help dd { margin: 0; }
 .modal.help .hint { margin: 7px 0 0; }
+/* The logo ends the left column and sends what follows to the right one. */
+.modal.help .brand {
+  break-after: column;
+  width: 220px;
+  height: 78px;
+  margin: 32px auto 0;
+  border-radius: 6px;
+  background: url(logo.png) center / contain no-repeat;
+}
 
 @media (max-width: 620px) {
-  .modal.help .mb { columns: 1; }
+  .modal.help .cols { columns: 1; }
+  /* One column has nowhere to break to: the break would open a second one
+     beside it, and a sideways scrollbar with it. */
+  .modal.help .brand { display: none; }
 }
 
 /* ---------- saved views (Ctrl+D) ---------- */
