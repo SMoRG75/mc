@@ -36,7 +36,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const bridge = EditorBridge.register(context, providers, settings.transferDefaults, {
     codepage: settings.ebcdicCodepage,
     recordLength: settings.ebcdicRecordLength,
-  });
+  }, settings.binaryExtensions);
 
   context.subscriptions.push(
     channel,

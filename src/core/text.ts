@@ -35,6 +35,27 @@ export function readable(text: string): string {
 }
 
 /**
+ * What F3 and F4 hand VS Code for text read from the host.
+ *
+ * A record can hold low-values — a spool file copied into a member keeps them
+ * — and the service converts them to NULs, which VS Code takes as the sign of
+ * a binary file and refuses to open. A view can show them as dots, as ISPF
+ * browse does. An edit cannot: Ctrl+S would write the dots back in their
+ * place, so it is refused with the two keys that do work. A file on the binary
+ * list is binary by the user's own word and goes through untouched either way.
+ */
+export function forEditor(content: Buffer, name: string, mode: 'view' | 'edit', binary: boolean): Buffer {
+  if (binary || !content.includes(0)) return content;
+  if (mode === 'view') return Buffer.from(readable(content.toString('utf8')), 'utf8');
+  // One sentence with the way out in it: VS Code shows a file system error's
+  // message and nothing else.
+  throw new UserFacingError(
+    `${name} contains x'00' bytes, which VS Code cannot edit as text — `
+    + 'F3 shows it with them as dots, Shift+F3 as raw EBCDIC.',
+  );
+}
+
+/**
  * Fits text into a fixed-record dataset.
  *
  * A 132-character line going into FB 80 is the single most common way to lose

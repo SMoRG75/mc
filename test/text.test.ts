@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { text as collect } from 'node:stream/consumers';
-import { fitToRecordLength, isBinary, readable, RecordFitter, resolveMode } from '../src/core/text';
+import {
+  fitToRecordLength, forEditor, isBinary, readable, RecordFitter, resolveMode,
+} from '../src/core/text';
 import { UserFacingError } from '../src/core/errors';
 import type { TransferOptions } from '../src/shared/protocol';
 
@@ -19,6 +21,21 @@ test('spool text loses its NULs so VS Code will open it', () => {
   assert.equal(readable('A\tB\nÆØÅ\r\n'), 'A\tB\nÆØÅ\r\n');
   // C1 controls too: U+0085 would otherwise end the line on screen.
   assert.equal(readable('A\u0085B\u000cC'), 'A.B.C');
+});
+
+test('F3 shows x\'00\' as dots, F4 refuses it, and binary is left alone', () => {
+  // A spool file copied into a member keeps its low-values.
+  const member = Buffer.from(' \u0000\u0000BEMT ÆØÅ\n', 'utf8');
+  assert.equal(forEditor(member, 'CEEMSG', 'view', false).toString('utf8'), ' ..BEMT ÆØÅ\n');
+  // Dots saved back would replace the bytes, so an edit is not offered.
+  assert.throws(() => forEditor(member, 'CEEMSG', 'edit', false), UserFacingError);
+  // On the binary list: whatever VS Code makes of it, the bytes are the bytes.
+  assert.equal(forEditor(member, 'X.ZIP', 'view', true), member);
+  assert.equal(forEditor(member, 'X.ZIP', 'edit', true), member);
+  // Without a NUL nothing changes, control characters and all.
+  const plain = Buffer.from('A\u000cB\n', 'utf8');
+  assert.equal(forEditor(plain, 'M', 'view', false), plain);
+  assert.equal(forEditor(plain, 'M', 'edit', false), plain);
 });
 
 test('lines that fit are passed through untouched', () => {

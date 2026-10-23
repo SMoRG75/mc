@@ -4,6 +4,7 @@ import type { ProviderRegistry } from './provider';
 import { describeError } from './errors';
 import { log } from './log';
 import { ebcdicToText } from './ebcdic';
+import { forEditor, resolveMode } from './text';
 
 export const SCHEME_EDIT = 'mc';
 export const SCHEME_VIEW = 'mc-view';
@@ -51,6 +52,7 @@ export class EditorBridge implements vscode.FileSystemProvider {
     private readonly providers: ProviderRegistry,
     private readonly transferDefaults: () => TransferOptions,
     private readonly ebcdic: EbcdicSettings,
+    private readonly binaryExtensions: () => readonly string[],
   ) {}
 
   static register(
@@ -58,8 +60,9 @@ export class EditorBridge implements vscode.FileSystemProvider {
     providers: ProviderRegistry,
     transferDefaults: () => TransferOptions,
     ebcdic: EbcdicSettings,
+    binaryExtensions: () => readonly string[],
   ): EditorBridge {
-    const bridge = new EditorBridge(providers, transferDefaults, ebcdic);
+    const bridge = new EditorBridge(providers, transferDefaults, ebcdic, binaryExtensions);
     context.subscriptions.push(
       vscode.workspace.registerFileSystemProvider(SCHEME_EDIT, bridge, { isCaseSensitive: true }),
       vscode.workspace.registerFileSystemProvider(SCHEME_VIEW, bridge, {
@@ -126,8 +129,12 @@ export class EditorBridge implements vscode.FileSystemProvider {
 
       // Same options as a save and as F5: the codepage a file is read with has
       // to be the one it is written back with.
-      return await provider.read(
+      const content = await provider.read(
         target.location, entry, options, new AbortController().signal,
+      );
+      return forEditor(
+        content, target.name, uri.scheme === SCHEME_VIEW ? 'view' : 'edit',
+        resolveMode(options, target.name, this.binaryExtensions()) === 'binary',
       );
     } catch (err) {
       throw toFileSystemError(err, uri);
