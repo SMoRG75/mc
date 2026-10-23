@@ -140,8 +140,11 @@ export const SHORTCUTS: readonly {
       ['submit <name>', 'Submit that row'],
       ['recall <name>', 'Recall a migrated data set — Enter on one asks'],
       ['refresh', 'Same as F2'],
+      ['tso <command>', 'Run a TSO command; the answer is in the Output panel'],
     ],
-    note: 'Esc leaves the command line and gives the keyboard back to the pane.',
+    note: 'Esc leaves the command line and gives the keyboard back to the pane. '
+      + 'tso runs on the active pane\'s host — the other pane\'s, from the local disk — '
+      + 'one command at a time; one that stops to ask for something cannot be answered.',
   },
 ];
 

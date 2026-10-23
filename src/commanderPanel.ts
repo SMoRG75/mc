@@ -18,6 +18,7 @@ import {
   type RememberedPane, type RememberedPanes,
 } from './core/settings';
 import type { SessionManager } from './zowe/sessions';
+import { issueTso } from './zowe/tso';
 
 const VIEW_TYPE = 'mainframeCommander';
 
@@ -35,6 +36,13 @@ const SEARCH_REPORT_MS = 150;
 
 /** How often, at most, finished transfers make a pane list itself again. */
 const REFRESH_MS = 300;
+
+/**
+ * Where `tso` writes. Made the first time it is needed, so the Output panel's
+ * list has no empty entry for someone who never types one, and kept when the
+ * panel closes: the answers are still worth reading.
+ */
+let tsoChannel: vscode.OutputChannel | undefined;
 
 interface PaneState {
   location: PaneLocation;
@@ -843,9 +851,63 @@ export class CommanderPanel {
         this.recallInBackground(pane, entry);
         return;
       }
+      case 'tso':
+        await this.runTso(pane, argument);
+        return;
       default:
-        throw new Error(`Unknown command '${verb}'. Known commands: cd, submit, recall, refresh.`);
+        throw new Error(`Unknown command '${verb}'. Known commands: cd, submit, recall, refresh, tso.`);
     }
+  }
+
+  /**
+   * `tso <command>`: one command through z/OSMF's TSO service, on the host the
+   * pane is on. The answer goes to an Output channel of its own, brought
+   * forward without taking the keyboard from the command line, so the next
+   * command can be typed straight away.
+   */
+  private async runTso(pane: PaneId, command: string): Promise<void> {
+    if (!command) throw new UserFacingError('tso needs a command, as in: tso LISTCAT LEVEL(IBMUSER)');
+    const profile = this.hostProfile(pane);
+    const session = await this.sessions.session(profile);
+    const output = this.tsoOutput();
+    // Which host it went to is part of the answer: TEST and PROD look alike.
+    output.appendLine(`${profile || session.ISession.hostname}> ${command}`);
+    output.show(true);
+    try {
+      const reply = await this.sessions.tso(session, () => issueTso(session, command));
+      for (const line of reply.lines) output.appendLine(line);
+      if (reply.waiting) {
+        throw new UserFacingError(
+          `${command.split(/\s+/)[0]!.toUpperCase()} stopped to ask for something, and mc cannot answer TSO prompts.`,
+          'Give the command everything it needs on the one line.',
+        );
+      }
+    } catch (err) {
+      // The channel is the record of the session, so it gets the failure too.
+      output.appendLine(`*** ${describeError(err).message}`);
+      throw err;
+    } finally {
+      output.appendLine('');
+    }
+  }
+
+  /**
+   * The profile a host command goes to: the active pane's, or the other
+   * pane's when the active one is on the local disk. With both on the local
+   * disk, the default profile.
+   */
+  private hostProfile(pane: PaneId): string {
+    const other: PaneId = pane === 'left' ? 'right' : 'left';
+    const remote = [pane, other].map((p) => this.panes[p].location).find((l) => l.kind !== 'local');
+    return remote?.profile ?? '';
+  }
+
+  private tsoOutput(): vscode.OutputChannel {
+    if (!tsoChannel) {
+      tsoChannel = vscode.window.createOutputChannel('Mainframe Commander: TSO');
+      this.context.subscriptions.push(tsoChannel);
+    }
+    return tsoChannel;
   }
 
   private scheduleJesRefresh(): void {

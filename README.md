@@ -241,10 +241,11 @@ Known limitations:
 
 Later, around 1.2:
 
-- [ ] TSO and console commands on the command line. z/OSMF's TSO service
-      starts an address space of its own, which may collide with the file
-      services over the user's ISPF profile the way two file requests did
-      (`ISPT036`), so this needs trying against a host before it is designed.
+- [x] TSO commands on the command line: `tso LISTCAT LEVEL(IBMUSER)`, answered
+      in an Output channel. Measured on Z Xplore not to collide with the file
+      services over the ISPF profile (`ISPT036`); the measurements and the
+      design are in [docs/tso-commands.md](docs/tso-commands.md).
+- [ ] Console commands on the command line.
 - [ ] Moving folders (F5 copies them; a move of a folder is refused)
 
 ## Sponsor

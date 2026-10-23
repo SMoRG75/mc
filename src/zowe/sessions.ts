@@ -21,6 +21,7 @@ export class SessionManager {
    */
   private readonly sessions = new Map<string, Promise<AbstractSession>>();
   private readonly fileServices = new Serializer();
+  private readonly tsoCommands = new Serializer();
 
   /**
    * Runs `call` — one z/OSMF file-service request that is not a transfer:
@@ -33,11 +34,21 @@ export class SessionManager {
    * measured not to, so transfers stay parallel and do not go through here.
    */
   fileService<T>(session: AbstractSession, call: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-    // By host and user rather than by profile: it is the user's ISPF profile
-    // that is held, and two profiles for one user share it.
-    const s = session.ISession;
-    const key = `${s.hostname}:${s.port}:${(s.user ?? '').toUpperCase()}`;
-    return this.fileServices.run(key, call, signal);
+    return this.fileServices.run(userKey(session), call, signal);
+  }
+
+  /**
+   * Runs `call` — one TSO command — once no other TSO command for the same
+   * user on the same host is running.
+   *
+   * A queue of its own, not the file services': TSO was measured not to
+   * collide with them, and a command must not wait behind a slow listing.
+   * Two TSO commands at once were not measured, and something typed by hand
+   * loses nothing by waiting for the one before — whose output then comes
+   * first, as it was asked for first.
+   */
+  tso<T>(session: AbstractSession, call: () => Promise<T>): Promise<T> {
+    return this.tsoCommands.run(userKey(session), call);
   }
 
   /** Re-reads zowe.config.json; call when the user edits their profiles. */
@@ -130,6 +141,15 @@ export class SessionManager {
  * on with every secure value silently empty. The connection then fails much
  * later with an unrelated-looking 401, so the check happens here instead.
  */
+/**
+ * By host and user rather than by profile: it is the user's ISPF profile and
+ * address space that are shared, and two profiles for one user share them.
+ */
+function userKey(session: AbstractSession): string {
+  const s = session.ISession;
+  return `${s.hostname}:${s.port}:${(s.user ?? '').toUpperCase()}`;
+}
+
 function assertHasCredentials(args: IProfArgAttrs[], profileName: string): void {
   const has = (name: string): boolean => {
     const arg = args.find((a) => a.argName === name);
