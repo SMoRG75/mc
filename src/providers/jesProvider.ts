@@ -8,6 +8,7 @@ import type {
 import type { Entry, Listing, PaneProvider, SourceItem } from '../core/provider';
 import type { SessionManager } from '../zowe/sessions';
 import { UserFacingError } from '../core/errors';
+import { readable } from '../core/text';
 import { pacedDownload } from '../zowe/flow';
 
 type JesRef =
@@ -235,7 +236,10 @@ export class JesProvider implements PaneProvider {
     const content = ref.kind === 'spool'
       ? await GetJobs.getSpoolContentById(session, ref.jobname, ref.jobid, ref.spoolId, options.codepage)
       : await GetJobs.getJcl(session, ref.jobname, ref.jobid);
-    return Buffer.from(String(content), 'utf8');
+    // This is the editor's copy, and nothing in JES can be written back, so
+    // control characters can become dots without losing anything. F5 streams
+    // through readTo and keeps the bytes as they are.
+    return Buffer.from(readable(String(content)), 'utf8');
   }
 
   /**

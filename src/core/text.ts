@@ -22,6 +22,19 @@ export function resolveMode(
 }
 
 /**
+ * Text that is only ever looked at, made safe to look at.
+ *
+ * Spool output carries whatever bytes the program wrote — a record that starts
+ * with low-values arrives from z/OSMF as NULs — and VS Code refuses to open
+ * anything with a NUL in it as "binary". ISPF browse and SDSF show control
+ * characters as dots, and so does this; tabs and line breaks stay as they are.
+ */
+export function readable(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g, '.');
+}
+
+/**
  * Fits text into a fixed-record dataset.
  *
  * A 132-character line going into FB 80 is the single most common way to lose

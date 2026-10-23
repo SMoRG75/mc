@@ -2,13 +2,23 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { text as collect } from 'node:stream/consumers';
-import { fitToRecordLength, isBinary, RecordFitter, resolveMode } from '../src/core/text';
+import { fitToRecordLength, isBinary, readable, RecordFitter, resolveMode } from '../src/core/text';
 import { UserFacingError } from '../src/core/errors';
 import type { TransferOptions } from '../src/shared/protocol';
 
 const options = (over: Partial<TransferOptions> = {}): TransferOptions => ({
   mode: 'auto', codepage: 'IBM-037', longLines: 'abort', onConflict: 'ask', destination: '*',
   ...over,
+});
+
+test('spool text loses its NULs so VS Code will open it', () => {
+  // The start of a real CICS spool file: low-values in front of the message.
+  const spool = ' \u0000\u0000\u0000\u0000BEMT 20260929 CICCEMT\r\n \u0000\u0000\u0000\u0000BEMT';
+  assert.equal(readable(spool), ' ....BEMT 20260929 CICCEMT\r\n ....BEMT');
+  // Tabs, line breaks and anything printable — Danish letters included — stay.
+  assert.equal(readable('A\tB\nÆØÅ\r\n'), 'A\tB\nÆØÅ\r\n');
+  // C1 controls too: U+0085 would otherwise end the line on screen.
+  assert.equal(readable('A\u0085B\u000cC'), 'A.B.C');
 });
 
 test('lines that fit are passed through untouched', () => {
