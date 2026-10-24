@@ -29,6 +29,21 @@ export interface CopyPlan {
   problems: string[];
   /** Folders made directly in the target location, which the pane there now has to show. */
   foldersMade: number;
+  /**
+   * For a move: the source folders whose content was queued, outermost first.
+   * Each goes once the transfers have run, if they have left it empty — see
+   * `removeMovedFolders`.
+   */
+  moved: MovedFolder[];
+}
+
+/** A source folder a move has emptied, or meant to. */
+export interface MovedFolder {
+  /** Where the folder itself is listed, and its entry there — what `remove` takes. */
+  parentLoc: PaneLocation;
+  entry: Entry;
+  /** The folder as a location, for listing what is left in it. */
+  inside: PaneLocation;
 }
 
 /**
@@ -42,6 +57,10 @@ export interface CopyPlan {
  * Nothing in here is allowed to stop the rest: a folder that cannot be made or
  * listed, a name that cannot be stored, a file that would land on another one
  * — each is left out with a line saying why, and the copy goes on without it.
+ *
+ * A move (F6) is the same copy, with each file deleted once it has landed. The
+ * folders it walked are deleted afterwards by `removeMovedFolders`, and only
+ * those left empty: whatever was skipped, left out or failed keeps its folder.
  */
 export async function planCopy(request: CopyRequest): Promise<CopyPlan> {
   const planner = new Planner(request);
@@ -60,7 +79,7 @@ export function applyPattern(pattern: string, sourceName: string): string {
 }
 
 class Planner {
-  readonly plan: CopyPlan = { requests: [], problems: [], foldersMade: 0 };
+  readonly plan: CopyPlan = { requests: [], problems: [], foldersMade: 0, moved: [] };
   /** An "all" answer, which stands for the rest of this copy. */
   private decided?: 'overwrite' | 'skip';
   /** Per target folder: the names this copy has already put there, by key. */
@@ -121,10 +140,6 @@ class Planner {
     entry: Entry, sourceLoc: PaneLocation, targetLoc: PaneLocation, name: string, many: boolean,
   ): Promise<void> {
     const { source, target, signal } = this.request;
-    if (this.request.move) {
-      this.leaveOut(entry.dto.name, 'folders can be copied, but not moved yet.');
-      return;
-    }
     if (!target.folder) {
       this.leaveOut(entry.dto.name, `${target.label(targetLoc)} cannot hold folders.`);
       return;
@@ -157,6 +172,7 @@ class Planner {
       return;
     }
     if (made.created && sameLocation(targetLoc, this.request.targetLoc)) this.plan.foldersMade += 1;
+    if (this.request.move) this.plan.moved.push({ parentLoc: sourceLoc, entry, inside });
 
     for (const child of listing.entries) {
       const childName = source.describe(inside, child).name;
@@ -210,6 +226,47 @@ class Planner {
   private leaveOut(name: string, why: string): void {
     this.plan.problems.push(`${name}: ${why}`);
   }
+}
+
+/**
+ * The second half of moving folders: once every transfer of the move has run,
+ * deletes the source folders it emptied, innermost first. A folder with
+ * anything still in it — a file skipped at a conflict, left out, or whose
+ * transfer failed — stays where it was, and so does everything around it.
+ *
+ * Looked at again rather than worked out from the transfers: what is in the
+ * folder now is what a delete would take with it, and a delete of a folder is
+ * recursive in every world. Returns a line for each folder kept with
+ * something in it, not for the ones around it that are kept only because they
+ * hold a kept folder.
+ */
+export async function removeMovedFolders(
+  source: PaneProvider, moved: MovedFolder[], signal: AbortSignal,
+): Promise<string[]> {
+  const problems: string[] = [];
+  const kept: PaneLocation[] = [];
+  for (const folder of [...moved].reverse()) {
+    const name = folder.entry.dto.name;
+    try {
+      const listing = await source.list(folder.inside, signal, { all: true });
+      const left = listing.entries.filter((child) => {
+        const at = source.enter(folder.inside, child);
+        return !(at && kept.some((k) => sameLocation(k, at)));
+      });
+      if (listing.entries.length > 0) {
+        kept.push(folder.inside);
+        if (left.length > 0) {
+          problems.push(`${name}: kept, with ${left.length} thing${left.length === 1 ? '' : 's'} in it that ${left.length === 1 ? 'was' : 'were'} not moved.`);
+        }
+        continue;
+      }
+      await source.remove(folder.parentLoc, [folder.entry]);
+    } catch (err) {
+      kept.push(folder.inside);
+      problems.push(`${name}: kept, as it could not be deleted: ${describeError(err).message}`);
+    }
+  }
+  return problems;
 }
 
 function locationKey(loc: PaneLocation): string {

@@ -17,7 +17,7 @@ const FKEYS: [key: string, label: string, hint?: string][] = [
   ['F3', 'View', 'Shift+F3 shows the raw bytes decoded as EBCDIC'],
   ['F4', 'Edit'],
   ['F5', 'Copy', 'Shift+F5 copies without the dialog'],
-  ['F6', 'Rename'],
+  ['F6', 'Move', 'Shift+F6 renames in place'],
   ['F7', 'Create'], ['F8', 'Delete'], ['F9', 'Submit'], ['F10', 'Compare'],
 ];
 
@@ -187,7 +187,7 @@ class App {
         break;
       case 'key':
         // VS Code keeps forwarding F-keys while a dialog is up; F6 on top of an
-        // open rename dialog must not open a second one.
+        // open move dialog must not open a second one.
         if (!modalOpen()) this.dispatcher.fromHost(message.key);
         break;
       case 'focus':
@@ -308,21 +308,25 @@ class App {
       }
 
       case 'copy':
-      case 'copyNoDialog': {
+      case 'copyNoDialog':
+      case 'move': {
         const ids = pane.selectionIds;
         if (ids.length === 0) return;
         const target = this.panes[other].location;
+        // A move always shows the dialog: it deletes, and the dialog is where
+        // the user sees what and where to before it does.
         const options = action === 'copyNoDialog'
           ? this.defaults
           : await transferDialog(
             this.defaults, this.codepages, describeSelection(pane.selection),
             target?.profile || 'local disk', target?.kind === 'ds' ? target.path : '',
+            action === 'move',
           );
         if (!options) return;
         // The host writes the pick to the settings; holding on to it here keeps
         // the next dialog in this session showing the same choice.
         this.defaults = { ...this.defaults, codepage: options.codepage };
-        return send({ type: 'copy', from: this.active, entryIds: ids, options });
+        return send({ type: action === 'move' ? 'move' : 'copy', from: this.active, entryIds: ids, options });
       }
 
       case 'rename': {

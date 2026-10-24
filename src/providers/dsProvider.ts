@@ -470,7 +470,7 @@ export class DsProvider implements PaneProvider {
     }
   }
 
-  /** F6. A new dataset name is read the same way as an allocated one. */
+  /** Shift+F6. A new dataset name is read the same way as an allocated one. */
   async rename(loc: PaneLocation, entry: Entry, newName: string): Promise<void> {
     const session = await this.sessions.session(loc.profile);
     const ref = entry.ref as DsRef;

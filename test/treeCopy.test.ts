@@ -5,7 +5,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Entry, PaneProvider } from '../src/core/provider';
 import { TransferQueue, type TransferRequest } from '../src/core/transferQueue';
-import { planCopy, type ConflictAnswer, type CopyRequest } from '../src/core/treeCopy';
+import { planCopy, removeMovedFolders, type ConflictAnswer, type CopyRequest } from '../src/core/treeCopy';
 import { LocalProvider } from '../src/providers/localProvider';
 import type { PaneLocation, TransferOptions } from '../src/shared/protocol';
 
@@ -183,13 +183,73 @@ test('what cannot be copied is left out with a reason, and the rest still goes',
   assert.deepEqual(plan.problems, ['dir: JES cannot hold folders.']);
 });
 
-test('moving a folder is refused rather than half done', async () => {
-  const from = await tree({ 'dir/a.txt': 'A' });
+/** Runs a move to the end, as F6 does: the transfers, then the folders they emptied. */
+async function move(req: CopyRequest): Promise<{ problems: string[]; kept: string[] }> {
+  const plan = await planCopy(req);
+  const queue = new TransferQueue(() => 4, () => {}, () => {});
+  await queue.enqueue(plan.requests);
+  const kept = await removeMovedFolders(req.source, plan.moved, new AbortController().signal);
+  return { problems: plan.problems, kept };
+}
+
+test('a folder is moved with everything in it, and nothing is left behind', async () => {
+  const from = await tree({ 'dir/a.txt': 'A', 'dir/deep/b.txt': 'B', 'stay.txt': 'S' }, ['dir/empty']);
   const to = await tree();
-  const plan = await planCopy(request({
+
+  const outcome = await move(request({
     sourceLoc: at(from), targetLoc: at(to), entries: await entries(from, 'dir'), move: true,
   }));
-  assert.equal(plan.requests.length, 0);
-  assert.match(plan.problems.join(), /not moved yet/);
-  assert.deepEqual(await fs.readdir(to), []);
+
+  assert.deepEqual(outcome, { problems: [], kept: [] });
+  assert.deepEqual(await contents(to), {
+    'dir/': '', 'dir/a.txt': 'A', 'dir/deep/': '', 'dir/deep/b.txt': 'B', 'dir/empty/': '',
+  });
+  assert.deepEqual(await contents(from), { 'stay.txt': 'S' });
+});
+
+test('a folder with something skipped in it is kept, and so are the folders around it', async () => {
+  const from = await tree({ 'dir/a.txt': 'new A', 'dir/sub/b.txt': 'new B', 'dir/sub/c.txt': 'new C', 'dir/other/d.txt': 'D' });
+  const to = await tree({ 'dir/sub/b.txt': 'old B' });
+
+  const outcome = await move(request({
+    sourceLoc: at(from), targetLoc: at(to), entries: await entries(from, 'dir'), move: true,
+    ask: async (): Promise<ConflictAnswer> => ({ answer: 'skip', all: false }),
+  }));
+
+  assert.deepEqual(outcome.problems, []);
+  assert.deepEqual(outcome.kept, ['sub: kept, with 1 thing in it that was not moved.'],
+    'only the folder that holds the skipped file is named, not dir around it');
+  assert.deepEqual(await contents(from), { 'dir/': '', 'dir/sub/': '', 'dir/sub/b.txt': 'new B' });
+  assert.deepEqual(await contents(to), {
+    'dir/': '', 'dir/a.txt': 'new A', 'dir/other/': '', 'dir/other/d.txt': 'D',
+    'dir/sub/': '', 'dir/sub/b.txt': 'old B', 'dir/sub/c.txt': 'new C',
+  });
+});
+
+test('a folder is never moved into itself, and stays where it was', async () => {
+  const root = await tree({ 'src/a.txt': 'A' }, ['src/inner']);
+  const outcome = await move(request({
+    sourceLoc: at(root), targetLoc: at(path.join(root, 'src', 'inner')), entries: await entries(root, 'src'), move: true,
+  }));
+  assert.match(outcome.problems.join(), /cannot be copied into itself/);
+  assert.deepEqual(outcome.kept, []);
+  assert.deepEqual(await contents(root), { 'src/': '', 'src/a.txt': 'A', 'src/inner/': '' });
+});
+
+test('the queue says when every transfer it was given is over, a cancelled one included', async () => {
+  const from = await tree({ 'a.txt': 'A', 'b.txt': 'B' });
+  const to = await tree();
+  const plan = await planCopy(request({ sourceLoc: at(from), targetLoc: at(to), entries: await entries(from, 'a.txt', 'b.txt') }));
+  // One at a time, so the second is still queued when it is cancelled.
+  let ids: string[] = [];
+  const queue = new TransferQueue(() => 1, (jobs) => { ids = jobs.map((j) => j.id); }, () => {});
+  const finished = queue.enqueue(plan.requests);
+  queue.cancel(ids[1]!);
+  await finished;
+  assert.deepEqual(Object.keys(await contents(to)), ['a.txt']);
+});
+
+test('an empty move is over at once', async () => {
+  const queue = new TransferQueue(() => 1, () => {}, () => {});
+  await queue.enqueue([]);
 });

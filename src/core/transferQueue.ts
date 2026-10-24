@@ -24,6 +24,8 @@ interface Job extends TransferRequest {
   bytes?: number;
   error?: string;
   abort: AbortController;
+  /** Tells `enqueue`'s caller this one is over, once, however it ended. */
+  settle?: () => void;
 }
 
 /** How often a running transfer may redraw the status bar. */
@@ -47,12 +49,25 @@ export class TransferQueue {
     private readonly onFinished: (job: TransferRequest) => void,
   ) {}
 
-  enqueue(requests: TransferRequest[]): void {
-    for (const request of requests) {
-      this.jobs.push({ ...request, id: randomUUID(), state: 'queued', abort: new AbortController() });
-    }
+  /**
+   * Resolves once every one of `requests` has finished — done, failed or
+   * cancelled alike. A move waits for that before it deletes the folders it
+   * has emptied.
+   */
+  enqueue(requests: TransferRequest[]): Promise<void> {
+    let left = requests.length;
+    const finished = new Promise<void>((resolve) => {
+      if (left === 0) resolve();
+      for (const request of requests) {
+        this.jobs.push({
+          ...request, id: randomUUID(), state: 'queued', abort: new AbortController(),
+          settle: () => { if (--left === 0) resolve(); },
+        });
+      }
+    });
     this.publish();
     this.pump();
+    return finished;
   }
 
   cancel(id: string): void {
@@ -60,6 +75,7 @@ export class TransferQueue {
     if (!job) return;
     if (job.state === 'queued') {
       job.state = 'cancelled';
+      this.settle(job);
     } else if (job.state === 'running') {
       job.abort.abort();
     }
@@ -101,6 +117,7 @@ export class TransferQueue {
       else log.error(`Transfer failed: ${what}: ${message}`, detail);
     } finally {
       this.running -= 1;
+      this.settle(job);
       this.onFinished(job);
       this.publish();
       this.pump();
@@ -149,6 +166,12 @@ export class TransferQueue {
       job.target.writeFrom(job.targetLoc, job.name, pipe, job.options, signal).catch(fail),
     ]);
     if (first) throw first.error;
+  }
+
+  private settle(job: Job): void {
+    const settle = job.settle;
+    job.settle = undefined;
+    settle?.();
   }
 
   /** Drop finished jobs once nothing is left to watch, so the list stays short. */

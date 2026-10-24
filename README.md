@@ -65,7 +65,7 @@ src/
 │  ├─ cursorHistory.ts     Which row the cursor was on, per listing
 │  ├─ ebcdic.ts            Local EBCDIC decoding for Shift+F3
 │  ├─ transferQueue.ts     Background queue for F5: streams source into target, with cancellation
-│  ├─ treeCopy.ts          Turns F5 on folders into folders made and files queued
+│  ├─ treeCopy.ts          Turns F5/F6 on folders into folders made and files queued
 │  ├─ search.ts            Alt+F7: walks down from a pane, matching names and text
 │  ├─ spool.ts             Temporary file for uploads that must be checked before they are sent
 │  ├─ editorBridge.ts      FileSystemProvider, so F3/F4 open in a real editor
@@ -126,6 +126,13 @@ special case, just `source.readTo()` streaming into `target.writeFrom()`.
   ahead: a folder inside a PDS, a load library (z/OSMF moves records, not load
   modules), two files that would become the same member, and anything that
   would be copied onto or into itself.
+- **A move is a copy that tidies up after itself.** F6 takes the same dialog
+  and the same walk as F5, and deletes each file once it has landed. The
+  folders it walked are deleted last, once every transfer has run, and only
+  if they are empty by then: a file skipped at a conflict, left out or failed
+  keeps its folder, and the folders around it, where they were. Job output is
+  not moved — JES deletes whole jobs, never a spool file — so F5 it and F8 the
+  job. Shift+F6 renames in place, as in Total Commander.
 - **JES is a file system.** Jobs are folders, spool DDs are files. That is why
   F3/F5/F8 mean the same thing there as everywhere else, without a separate
   command palette just for jobs.
@@ -162,7 +169,7 @@ special case, just `source.readTo()` streaming into `target.writeFrom()`.
   exists". Inside a PDS and on USS/local disk, F7 is still just a name prompt.
 - **Dataset names are read as in TSO.** A name without apostrophes is relative to
   the user's own HLQ, so `TEST.JCL` becomes `IBMUSER.TEST.JCL`; `'SYS1.PARMLIB'`
-  is used exactly as typed. This holds for both F7 and F6, and both dialogs
+  is used exactly as typed. This holds for both F7 and Shift+F6, and both dialogs
   therefore pre-fill with apostrophes — the field already carries a full
   qualifier, which the user should not get their own put on top of.
 - **File system provider rather than temp files.** F3/F4 open `mc://LPAR1/BACKUP01`,
@@ -253,7 +260,9 @@ Later, around 1.2:
       `console D IPLINFO`, answered in an Output channel of their own. Tried
       on Z Xplore, whose users have INFO console authority — display
       commands; the design is in [docs/console-commands.md](docs/console-commands.md).
-- [ ] Moving folders (F5 copies them; a move of a folder is refused)
+- [x] Moving files and folders to the other pane: F6, as in Total Commander,
+      with Shift+F6 for renaming in place. A folder goes once everything in it
+      has been moved.
 
 ## Sponsor
 

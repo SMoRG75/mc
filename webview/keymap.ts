@@ -10,7 +10,7 @@
 export type Action =
   | 'up' | 'down' | 'pageUp' | 'pageDown' | 'home' | 'end'
   | 'enter' | 'parent' | 'switchPane' | 'mark' | 'markAll' | 'invertMark'
-  | 'view' | 'viewEbcdic' | 'edit' | 'copy' | 'copyNoDialog' | 'rename' | 'create'
+  | 'view' | 'viewEbcdic' | 'edit' | 'copy' | 'copyNoDialog' | 'move' | 'rename' | 'create'
   | 'delete' | 'submit' | 'compare' | 'refresh' | 'swapPanes' | 'focusCommandLine'
   | 'quickFilter' | 'cancel' | 'nextView' | 'sortNext' | 'sortReverse'
   | 'editFilter' | 'favourites' | 'help' | 'search'
@@ -39,7 +39,9 @@ const BINDINGS: Record<string, Action> = {
   F4: 'edit',
   F5: 'copy',
   'Shift+F5': 'copyNoDialog',
-  F6: 'rename',
+  // Total Commander's: F6 moves to the other pane, Shift+F6 renames in place.
+  F6: 'move',
+  'Shift+F6': 'rename',
   F7: 'create',
   F8: 'delete',
   Delete: 'delete',
@@ -103,7 +105,7 @@ export const SHORTCUTS: readonly {
       ['Ctrl+A', 'Mark everything'],
       ['Ctrl+I', 'Invert the marks'],
     ],
-    note: 'F5, F8 and F9 work on the marked rows — or on the row under the cursor when nothing is marked.',
+    note: 'F5, F6, F8 and F9 work on the marked rows — or on the row under the cursor when nothing is marked.',
   },
   {
     title: 'The F-key bar',
@@ -115,7 +117,8 @@ export const SHORTCUTS: readonly {
       ['F4', 'Edit'],
       ['F5', 'Copy to the other pane'],
       ['Shift+F5', 'Copy with the last settings, no dialog'],
-      ['F6', 'Rename'],
+      ['F6', 'Move to the other pane — folders too'],
+      ['Shift+F6', 'Rename'],
       ['F7', 'New member, folder or dataset'],
       ['F8 · Delete', 'Delete'],
       ['F9', 'Submit as JCL'],

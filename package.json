@@ -138,6 +138,14 @@
       {
         "command": "mc.key",
         "args": {
+          "key": "Shift+F6"
+        },
+        "key": "shift+f6",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
           "key": "F7"
         },
         "key": "f7",

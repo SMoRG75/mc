@@ -9,7 +9,7 @@ import { UserFacingError } from '../../src/core/errors';
 import type { Entry, PaneProvider } from '../../src/core/provider';
 import { search } from '../../src/core/search';
 import { TransferQueue, type TransferRequest } from '../../src/core/transferQueue';
-import { planCopy } from '../../src/core/treeCopy';
+import { planCopy, removeMovedFolders } from '../../src/core/treeCopy';
 import { LocalProvider } from '../../src/providers/localProvider';
 import { UssProvider } from '../../src/providers/ussProvider';
 import type { PaneLocation, SearchHitDto } from '../../src/shared/protocol';
@@ -175,6 +175,40 @@ test('a local tree copies to USS and back unchanged, folders and all', async () 
   assert.deepEqual(records(await fs.readFile(path.join(tree, 'deep', 'b.txt'), 'utf8')), ['b']);
   assert.deepEqual(await fs.readFile(path.join(tree, 'deep', 'deeper', 'c.bin')), Buffer.from([0, 1, 2, 255]));
   assert.deepEqual(await fs.readdir(path.join(tree, 'empty')), [], 'the empty folder came along');
+});
+
+test('a local tree moved to USS and back leaves nothing behind on either trip', async () => {
+  const from = await fs.mkdtemp(path.join(os.tmpdir(), 'mc-host-'));
+  await fs.mkdir(path.join(from, 'mct-move', 'deep'), { recursive: true });
+  await fs.mkdir(path.join(from, 'mct-move', 'empty'));
+  await fs.writeFile(path.join(from, 'mct-move', 'a.txt'), 'æøå\n');
+  await fs.writeFile(path.join(from, 'mct-move', 'deep', 'b.txt'), 'b\n');
+
+  const up = await planCopy({
+    source: local, sourceLoc: localAt(from), target: uss, targetLoc: here,
+    entries: (await local.list(localAt(from), signal(), { all: true })).entries,
+    options: options({ mode: 'auto' }), move: true, ask: async () => undefined, signal: signal(),
+  });
+  assert.deepEqual(up.problems, []);
+  assert.deepEqual(await runAll(up.requests), []);
+  assert.deepEqual(await removeMovedFolders(local, up.moved, signal()), []);
+  assert.deepEqual(await fs.readdir(from), [], 'the local folder went');
+
+  const back = await fs.mkdtemp(path.join(os.tmpdir(), 'mc-host-'));
+  const down = await planCopy({
+    source: uss, sourceLoc: here, target: local, targetLoc: localAt(back),
+    entries: [await entry('mct-move')], options: options({ mode: 'auto' }), move: true,
+    ask: async () => undefined, signal: signal(),
+  });
+  assert.deepEqual(down.problems, []);
+  assert.deepEqual(await runAll(down.requests), []);
+  assert.deepEqual(await removeMovedFolders(uss, down.moved, signal()), []);
+  assert.ok(!(await entries()).has('mct-move'), 'the USS directory went');
+
+  const tree = path.join(back, 'mct-move');
+  assert.deepEqual(records(await fs.readFile(path.join(tree, 'a.txt'), 'utf8')), ['æøå']);
+  assert.deepEqual(records(await fs.readFile(path.join(tree, 'deep', 'b.txt'), 'utf8')), ['b']);
+  assert.deepEqual(await fs.readdir(path.join(tree, 'empty')), []);
 });
 
 test('Alt+F7 finds names and text below a USS directory', async () => {

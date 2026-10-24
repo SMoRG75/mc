@@ -7,7 +7,7 @@ import {
 } from './shared/protocol';
 import type { Entry, PaneProvider, ProviderRegistry } from './core/provider';
 import { TransferQueue, type TransferRequest } from './core/transferQueue';
-import { planCopy, type ConflictAnswer } from './core/treeCopy';
+import { planCopy, removeMovedFolders, type ConflictAnswer, type MovedFolder } from './core/treeCopy';
 import { search } from './core/search';
 import { EditorBridge, type OpenMode } from './core/editorBridge';
 import { CursorHistory } from './core/cursorHistory';
@@ -636,6 +636,17 @@ export class CommanderPanel {
     if (!target.capabilities(targetLoc).write) {
       throw new Error(`Cannot write to ${target.label(targetLoc)}.`);
     }
+    if (move && source.kind === 'jes') {
+      // JES deletes whole jobs, never a spool file, so a move would copy
+      // everything and then fail at every delete.
+      throw new UserFacingError(
+        'Job output can be copied, not moved.',
+        'F5 copies it; F8 purges the job afterwards.',
+      );
+    }
+    if (move && !source.capabilities(sourceLoc).delete) {
+      throw new UserFacingError(`Nothing can be deleted in ${source.label(sourceLoc)}, so nothing can be moved from it.`);
+    }
 
     // The codepage the user picked becomes the default for next time. Failing to
     // save a preference is worth saying out loud, but never worth stopping the
@@ -659,13 +670,39 @@ export class CommanderPanel {
       const count = plan.problems.length;
       this.post({
         type: 'error', pane: from,
-        message: `${count} item${count === 1 ? ' was' : 's were'} left out of the copy.`,
+        message: `${count} item${count === 1 ? ' was' : 's were'} left out of the ${move ? 'move' : 'copy'}.`,
         detail: plan.problems.join('\n'),
       });
     }
     // The new folders are there already; the files arrive as the queue runs.
     if (plan.foldersMade > 0) this.refreshSoon(to);
-    this.queue.enqueue(plan.requests);
+    const finished = this.queue.enqueue(plan.requests);
+    if (plan.moved.length > 0) void finished.then(() => this.removeMoved(from, source, plan.moved));
+  }
+
+  /**
+   * Deletes the source folders a move has emptied, once its transfers are
+   * over, and says which were kept. Not awaited by F6: the transfers can take
+   * minutes, and the panel has to go on answering in the meantime.
+   */
+  private async removeMoved(from: PaneId, source: PaneProvider, moved: MovedFolder[]): Promise<void> {
+    try {
+      const kept = await removeMovedFolders(source, moved, new AbortController().signal);
+      if (kept.length > 0) {
+        this.post({
+          type: 'error', pane: from,
+          message: `${kept.length} folder${kept.length === 1 ? ' was' : 's were'} not moved in full, and kept.`,
+          detail: kept.join('\n'),
+        });
+      }
+    } catch (err) {
+      const { message, detail } = describeError(err);
+      this.post({ type: 'error', pane: from, message, detail });
+    } finally {
+      for (const pane of ['left', 'right'] as PaneId[]) {
+        if (moved.some((m) => sameLocation(this.panes[pane].location, m.parentLoc))) this.refreshSoon(pane);
+      }
+    }
   }
 
   /**

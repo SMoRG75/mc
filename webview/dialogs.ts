@@ -258,14 +258,19 @@ function describeLocation(location: PaneLocation): string {
  * transfer mode or a truncated line is not something the user finds out about
  * until much later.
  */
+/**
+ * F5 and F6: the same choices, since a move is a copy that deletes what it
+ * copied once it has landed.
+ */
 export function transferDialog(
   defaults: TransferOptions, codepages: string[], what: string,
-  targetLabel: string, targetPath: string,
+  targetLabel: string, targetPath: string, move = false,
 ): Promise<TransferOptions | undefined> {
+  const verb = move ? 'Move' : 'Copy';
   return modal<TransferOptions>((resolve) => {
     const box = document.createElement('form');
     box.innerHTML = `
-      <div class="mh">Copy ${escapeHtml(what)} to ${escapeHtml(targetLabel)}<span>F5</span></div>
+      <div class="mh">${verb} ${escapeHtml(what)} to ${escapeHtml(targetLabel)}<span>${move ? 'F6' : 'F5'}</span></div>
       <div class="mb">
         <label class="row"><span>Destination</span>
           <input class="field" name="destination" spellcheck="false"></label>
@@ -282,10 +287,11 @@ export function transferDialog(
         <div class="row"><span>On conflict</span>${radios('onConflict', [
           ['ask', 'Ask'], ['overwrite', 'Overwrite'], ['skip', 'Skip'],
         ], defaults.onConflict)}</div>
+        ${move ? '<p class="hint">Each file is deleted once it has landed, and each folder once it is empty. Whatever is skipped or fails stays where it was.</p>' : ''}
       </div>
       <div class="mf">
         <button type="button" class="btn" data-cancel>Cancel</button>
-        <button type="submit" class="btn pri">Copy</button>
+        <button type="submit" class="btn pri">${verb}</button>
       </div>`;
 
     const form = box as HTMLFormElement;
