@@ -668,36 +668,44 @@ export class CommanderPanel {
     });
     if (plan.problems.length > 0) {
       const count = plan.problems.length;
-      this.post({
-        type: 'error', pane: from,
-        message: `${count} item${count === 1 ? ' was' : 's were'} left out of the ${move ? 'move' : 'copy'}.`,
-        detail: plan.problems.join('\n'),
-      });
+      const message = `${count} item${count === 1 ? ' was' : 's were'} left out of the ${move ? 'move' : 'copy'}`;
+      if (move) {
+        // The source pane lists itself again as each file goes, which would
+        // wipe this off its footer before anyone had read it.
+        warnLasting(message, plan.problems);
+      } else {
+        this.post({ type: 'error', pane: from, message: `${message}.`, detail: plan.problems.join('\n') });
+      }
     }
     // The new folders are there already; the files arrive as the queue runs.
     if (plan.foldersMade > 0) this.refreshSoon(to);
     const finished = this.queue.enqueue(plan.requests);
-    if (plan.moved.length > 0) void finished.then(() => this.removeMoved(from, source, plan.moved));
+    if (plan.moved.length > 0) void finished.then(() => this.removeMoved(source, plan.moved));
   }
 
   /**
    * Deletes the source folders a move has emptied, once its transfers are
    * over, and says which were kept. Not awaited by F6: the transfers can take
    * minutes, and the panel has to go on answering in the meantime.
+   *
+   * Said in a notification rather than the pane's footer: it comes when the
+   * move is over, which may be long after F6, and the panes list themselves
+   * again right after it, which clears a footer.
    */
-  private async removeMoved(from: PaneId, source: PaneProvider, moved: MovedFolder[]): Promise<void> {
+  private async removeMoved(source: PaneProvider, moved: MovedFolder[]): Promise<void> {
     try {
       const kept = await removeMovedFolders(source, moved, new AbortController().signal);
       if (kept.length > 0) {
-        this.post({
-          type: 'error', pane: from,
-          message: `${kept.length} folder${kept.length === 1 ? ' was' : 's were'} not moved in full, and kept.`,
-          detail: kept.join('\n'),
-        });
+        const names = kept.map((line) => line.slice(0, line.indexOf(':')));
+        warnLasting(
+          `${kept.length} folder${kept.length === 1 ? ' was' : 's were'} not moved in full, and kept: `
+            + `${names.slice(0, 3).join(', ')}${names.length > 3 ? ', …' : ''}`,
+          kept,
+        );
       }
     } catch (err) {
       const { message, detail } = describeError(err);
-      this.post({ type: 'error', pane: from, message, detail });
+      warnLasting(`The move could not finish: ${message}`, detail ? [detail] : []);
     } finally {
       for (const pane of ['left', 'right'] as PaneId[]) {
         if (moved.some((m) => sameLocation(this.panes[pane].location, m.parentLoc))) this.refreshSoon(pane);
@@ -1057,6 +1065,16 @@ export class CommanderPanel {
   }
 }
 
+
+/**
+ * A warning that stays until it is dismissed, with the particulars — one line
+ * each, too many for a notification — in the log, which its button opens.
+ */
+function warnLasting(message: string, lines: string[]): void {
+  log.warn(message, lines.join('\n') || undefined);
+  void vscode.window.showWarningMessage(`${message}.`, ...(lines.length > 0 ? ['Show Log'] : []))
+    .then((answer) => { if (answer) void vscode.commands.executeCommand('mc.showLog'); });
+}
 
 /**
  * The overwrite question. With more than one thing being copied, it also
