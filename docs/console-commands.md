@@ -19,7 +19,18 @@ The first PUT took about 3 seconds, presumably the EMCS console being
 activated. The follow-ups (`solmsgs`) answered `{"cmd-response": ""}`, so
 after `D T` mc asks twice more and stops: the answer is in the channel at
 once, and the next console command waits about two seconds behind it.
-Nothing that needs more than INFO authority was sent.
+A command beyond that authority is refused in the answer, not by z/OSMF:
+`S CICST1` came back as an ordinary answer, shown in the channel with RACF's
+explanation and no failure in the pane:
+
+```
+ IEE345I START    AUTHORITY INVALID, FAILED BY SECURITY PRODUCT
+ ICH408I USER(<userid>) GROUP(STUDENTU) NAME(...)
+   MVS.START.STC.CICST1 CL(OPERCMDS)
+   INSUFFICIENT ACCESS AUTHORITY
+   FROM MVS.** (G)
+   ACCESS INTENT(UPDATE )  ACCESS ALLOWED(READ   )
+```
 
 ## What the user gets
 
@@ -94,9 +105,11 @@ suggests otherwise.
 ## Open questions, for a real z/OSMF
 
 1. Does z/OSMF refuse a user without any console authority with HTTP 4xx and
-   a `reason`, and how does that read? A command beyond INFO authority
-   should come back as `IEE345I` in the answer, as on the virtual mainframe,
-   but that was not sent on Z Xplore.
+   a `reason`, and how does that read? A command beyond the authority the
+   user has is answered with `IEE345I` and `ICH408I` (above); a user with no
+   console at all was not tried, and will not be: it needs a user made for
+   the purpose by a site's security people. The README lists it as a known
+   limitation and asks for an issue from anyone who meets it.
 2. How late do JES2 replies come on a busy system, and is one second
    between asks right?
 3. Does `defcn` clash when the same user is at another EMCS console (SDSF's

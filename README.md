@@ -223,14 +223,11 @@ special case, just `source.readTo()` streaming into `target.writeFrom()`.
 Zowe v8 API and tested against a real z/OSMF (IBM Z Xplore) with
 `npm run test:host`, alongside the unit tests for the parts that can lose data
 quietly: the EBCDIC tables, LRECL fitting, transfer-mode choice and error
-parsing.
+parsing. Recall of migrated data sets, which Z Xplore cannot show for want of
+DFSMShsm, has been tried by hand on a z/OS that has it, and works.
 
 Known limitations:
 
-- **Recall of migrated data sets has not been tried against a real
-  DFSMShsm.** Z Xplore has none for its users, so the recall — queued at HSM,
-  then checked on until the data set is back — is tested against a fake
-  z/OSMF only. Reports from a system with HSM are welcome.
 - A directory with many thousands of entries lists slowly on some systems:
   z/OSMF builds a listing one entry at a time, about 30 ms each on Z Xplore,
   and gives up after 30 seconds. A pane asks only for `mc.list.pageSize`
@@ -238,6 +235,13 @@ Known limitations:
 - Transfers run in parallel. Concurrent listings were shown to collide over
   the user's ISPF profile and are sent one at a time; concurrent reads were
   measured not to, concurrent writes have not been measured.
+- **A user with no console authority at all has not been tried.** A command
+  beyond the user's authority is answered by the console (`IEE345I`), and
+  that is shown as it is. But how z/OSMF refuses someone who may not use its
+  console service at all is known only from IBM's documentation. If
+  `/D T` gives you a message that makes no sense, please
+  [open an issue](https://github.com/SMoRG75/mc/issues) with what the pane
+  said and the log at `mc.log.level` `debug`.
 
 Later, around 1.2:
 
