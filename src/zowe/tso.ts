@@ -1,6 +1,6 @@
 import { ZosmfRestClient } from '@zowe/core-for-zowe-sdk';
 import type { AbstractSession } from '@zowe/imperative';
-import { UserFacingError } from '../core/errors';
+import { isNotFound, UserFacingError } from '../core/errors';
 
 /**
  * One TSO command, through z/OSMF's stateless TSO API (z/OS 2.4 and later).
@@ -57,9 +57,4 @@ export function parseTsoReply(body: StatelessResponse): TsoReply {
   const ready = lines.length > 0 && lines[lines.length - 1]!.trim() === 'READY';
   if (ready) lines.pop();
   return { lines, waiting: body.tsoPromptReceived === 'N' && !ready };
-}
-
-function isNotFound(err: unknown): boolean {
-  const e = err as { errorCode?: unknown; message?: unknown };
-  return String(e.errorCode) === '404' || /status 404\b/.test(String(e.message ?? ''));
 }

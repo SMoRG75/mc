@@ -18,6 +18,7 @@ import {
   type RememberedPane, type RememberedPanes,
 } from './core/settings';
 import type { SessionManager } from './zowe/sessions';
+import { issueConsole } from './zowe/console';
 import { issueTso } from './zowe/tso';
 
 const VIEW_TYPE = 'mainframeCommander';
@@ -43,6 +44,8 @@ const REFRESH_MS = 300;
  * panel closes: the answers are still worth reading.
  */
 let tsoChannel: vscode.OutputChannel | undefined;
+/** Where `console` writes; made and kept the same way. */
+let consoleChannel: vscode.OutputChannel | undefined;
 
 interface PaneState {
   location: PaneLocation;
@@ -812,6 +815,11 @@ export class CommanderPanel {
    * equivalent are wired; anything else is refused rather than guessed at.
    */
   private async runCommandLine(pane: PaneId, line: string): Promise<void> {
+    if (line.trim().startsWith('/')) {
+      // SDSF's way of giving a console command, which is what the fingers know.
+      await this.runConsole(pane, line.trim().slice(1).trim(), line.trim());
+      return;
+    }
     const [verb, ...rest] = line.trim().split(/\s+/);
     const argument = rest.join(' ');
     switch ((verb ?? '').toLowerCase()) {
@@ -854,8 +862,46 @@ export class CommanderPanel {
       case 'tso':
         await this.runTso(pane, argument);
         return;
+      case 'console':
+        await this.runConsole(pane, argument, line.trim());
+        return;
       default:
-        throw new Error(`Unknown command '${verb}'. Known commands: cd, submit, recall, refresh, tso.`);
+        throw new Error(`Unknown command '${verb}'. Known commands: cd, submit, recall, refresh, tso, console (or /).`);
+    }
+  }
+
+  /**
+   * `console <command>`, or `/<command>` as in SDSF: one operator command
+   * through z/OSMF's console service, on the host the pane is on. Written to
+   * an Output channel of its own as the messages come in, the way `tso` is.
+   *
+   * Nothing asks first, whatever the command — the console's own authority
+   * decides what the user may do, as it would at any other console — but the
+   * echo names the profile, and a USS path typed with no `cd` in front is
+   * refused rather than sent off as a command.
+   */
+  private async runConsole(pane: PaneId, command: string, typed: string): Promise<void> {
+    if (!command) throw new UserFacingError('console needs a command, as in: console D IPLINFO — or /D IPLINFO');
+    if (typed.startsWith('/') && /^\/\S*\//.test(typed)) {
+      throw new UserFacingError(
+        `'${typed.split(/\s+/)[0]}' looks like a path, not a console command.`,
+        `cd ${typed} goes there; a console command is / and the command, as in /D T.`,
+      );
+    }
+    const profile = this.hostProfile(pane);
+    const session = await this.sessions.session(profile);
+    const output = this.consoleOutput();
+    output.appendLine(`${profile || session.ISession.hostname}> ${command}`);
+    output.show(true);
+    try {
+      await this.sessions.console(session, () => issueConsole(session, command, (lines) => {
+        for (const line of lines) output.appendLine(line);
+      }));
+    } catch (err) {
+      output.appendLine(`*** ${describeError(err).message}`);
+      throw err;
+    } finally {
+      output.appendLine('');
     }
   }
 
@@ -900,6 +946,14 @@ export class CommanderPanel {
     const other: PaneId = pane === 'left' ? 'right' : 'left';
     const remote = [pane, other].map((p) => this.panes[p].location).find((l) => l.kind !== 'local');
     return remote?.profile ?? '';
+  }
+
+  private consoleOutput(): vscode.OutputChannel {
+    if (!consoleChannel) {
+      consoleChannel = vscode.window.createOutputChannel('Mainframe Commander: Console');
+      this.context.subscriptions.push(consoleChannel);
+    }
+    return consoleChannel;
   }
 
   private tsoOutput(): vscode.OutputChannel {

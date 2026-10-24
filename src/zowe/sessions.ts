@@ -22,6 +22,7 @@ export class SessionManager {
   private readonly sessions = new Map<string, Promise<AbstractSession>>();
   private readonly fileServices = new Serializer();
   private readonly tsoCommands = new Serializer();
+  private readonly consoleCommands = new Serializer();
 
   /**
    * Runs `call` — one z/OSMF file-service request that is not a transfer:
@@ -49,6 +50,17 @@ export class SessionManager {
    */
   tso<T>(session: AbstractSession, call: () => Promise<T>): Promise<T> {
     return this.tsoCommands.run(userKey(session), call);
+  }
+
+  /**
+   * Runs `call` — one console command, with the messages that come after it —
+   * once no other console command for the same user on the same host is
+   * running, so that each command's answer is written out in one piece.
+   * Not behind the file services or TSO: the console is another service, with
+   * no TSO address space of the user's in it.
+   */
+  console<T>(session: AbstractSession, call: () => Promise<T>): Promise<T> {
+    return this.consoleCommands.run(userKey(session), call);
   }
 
   /** Re-reads zowe.config.json; call when the user edits their profiles. */

@@ -90,6 +90,12 @@ function tsoTrouble(described: { message: string; detail?: string }): { message:
   };
 }
 
+/** z/OSMF answered 404, however Imperative chose to report it. */
+export function isNotFound(err: unknown): boolean {
+  const e = err as { errorCode?: unknown; message?: unknown };
+  return String(e.errorCode) === '404' || /status 404\b/.test(String(e.message ?? ''));
+}
+
 function describeRaw(err: unknown): { message: string; detail?: string } {
   if (typeof err === 'object' && err !== null) {
     const e = err as ImperativeLike;

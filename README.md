@@ -245,7 +245,10 @@ Later, around 1.2:
       in an Output channel. Measured on Z Xplore not to collide with the file
       services over the ISPF profile (`ISPT036`); the measurements and the
       design are in [docs/tso-commands.md](docs/tso-commands.md).
-- [ ] Console commands on the command line.
+- [x] Console commands on the command line: `/D IPLINFO`, as in SDSF, or
+      `console D IPLINFO`, answered in an Output channel of their own. Tried
+      on Z Xplore, whose users have INFO console authority — display
+      commands; the design is in [docs/console-commands.md](docs/console-commands.md).
 - [ ] Moving folders (F5 copies them; a move of a folder is refused)
 
 ## Sponsor

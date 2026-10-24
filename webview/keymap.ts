@@ -141,10 +141,12 @@ export const SHORTCUTS: readonly {
       ['recall <name>', 'Recall a migrated data set — Enter on one asks'],
       ['refresh', 'Same as F2'],
       ['tso <command>', 'Run a TSO command; the answer is in the Output panel'],
+      ['/<command>', 'Run a console command, as in SDSF — or console <command>'],
     ],
     note: 'Esc leaves the command line and gives the keyboard back to the pane. '
-      + 'tso runs on the active pane\'s host — the other pane\'s, from the local disk — '
-      + 'one command at a time; one that stops to ask for something cannot be answered.',
+      + 'tso and console commands run on the active pane\'s host — the other pane\'s, from the local disk — '
+      + 'one at a time; a TSO command that stops to ask for something cannot be answered. '
+      + 'Nothing asks before a console command: what you may do is up to your console authority.',
   },
 ];
 
