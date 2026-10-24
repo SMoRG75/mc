@@ -7,7 +7,7 @@ only setup required.
 
 The design sketch it started from is in
 [`docs/mainframe-commander-mockup.html`](docs/mainframe-commander-mockup.html) — kept as it
-was drawn, so it differs from 1.0 in places.
+was drawn, so it differs from what was built in places.
 
 ## Getting started
 
@@ -226,7 +226,7 @@ special case, just `source.readTo()` streaming into `target.writeFrom()`.
 
 ## Status
 
-1.0. All four worlds — local disk, MVS, USS and JES — are written against the
+1.1. All four worlds — local disk, MVS, USS and JES — are written against the
 Zowe v8 API and tested against a real z/OSMF (IBM Z Xplore) with
 `npm run test:host`, alongside the unit tests for the parts that can lose data
 quietly: the EBCDIC tables, LRECL fitting, transfer-mode choice and error
@@ -250,19 +250,11 @@ Known limitations:
   [open an issue](https://github.com/SMoRG75/mc/issues) with what the pane
   said and the log at `mc.log.level` `debug`.
 
-Later, around 1.2:
-
-- [x] TSO commands on the command line: `tso LISTCAT LEVEL(IBMUSER)`, answered
-      in an Output channel. Measured on Z Xplore not to collide with the file
-      services over the ISPF profile (`ISPT036`); the measurements and the
-      design are in [docs/tso-commands.md](docs/tso-commands.md).
-- [x] Console commands on the command line: `/D IPLINFO`, as in SDSF, or
-      `console D IPLINFO`, answered in an Output channel of their own. Tried
-      on Z Xplore, whose users have INFO console authority — display
-      commands; the design is in [docs/console-commands.md](docs/console-commands.md).
-- [x] Moving files and folders to the other pane: F6, as in Total Commander,
-      with Shift+F6 for renaming in place. A folder goes once everything in it
-      has been moved.
+1.1 did what 1.0 put off: TSO and console commands on the command line, and
+moving files and folders with F6. What changed is in the
+[CHANGELOG](CHANGELOG.md); the designs of the two commands, and what was
+measured on a host for them, are in [docs/tso-commands.md](docs/tso-commands.md)
+and [docs/console-commands.md](docs/console-commands.md).
 
 ## Sponsor
 

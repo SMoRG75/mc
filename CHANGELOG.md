@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.1.0 — 2026-10-24
+
+Everything 1.0 put off until "around 1.2": TSO and console commands on the
+command line, and moving folders — which turned out to need moving at all,
+since no key had ever sent a move.
+
+- **F6 moves to the other pane, Shift+F6 renames in place**, as in Total
+  Commander. Until now F6 renamed, and nothing moved. A move takes the F5
+  dialog — always shown, since it deletes — and is the same copy, with each
+  file deleted once it has landed. Folders go last, once every transfer has
+  run, and only those left empty: a file skipped at a conflict, left out or
+  failed keeps its folder and the folders around it where they were, and a
+  warning that stays until dismissed names them, with Show Log for the
+  particulars. Job output is not moved — JES deletes whole jobs, never a
+  spool file — so F5 it and F8 the job.
+- **`tso <command>`** on the command line runs one TSO command through
+  z/OSMF's stateless TSO service (z/OS 2.4 and later) on the active pane's
+  host, or the other pane's from the local disk. The answer goes to an Output
+  channel, *Mainframe Commander: TSO*, echoed with the profile it went to.
+  Measured on Z Xplore not to collide with the file services over the ISPF
+  profile; see [docs/tso-commands.md](docs/tso-commands.md). A command that
+  stops to ask for something is said to have done so, as mc cannot answer.
+- **`/<command>`**, as in SDSF, or `console <command>`, runs an operator
+  command through z/OSMF's console service, answered in *Mainframe Commander:
+  Console* as the messages come in. Nothing asks first: the console authority
+  decides. A path typed without `cd`, like `/u/tester`, is refused rather
+  than sent. See [docs/console-commands.md](docs/console-commands.md).
+- F3 shows members, data sets, USS files and spool files that contain
+  low-values — a CICS `CEEMSG`, or one copied into a PDS — with control
+  characters as dots, as ISPF browse does. VS Code refused them as binary.
+  Enter and F4 on a data set or file with low-values refuse with a message
+  naming F3 and Shift+F3, as Ctrl+S would write the dots back. F5 copies the
+  bytes as they are.
+- Recall of migrated data sets, untested against DFSMShsm in 1.0.0, has been
+  tried by hand on a z/OS that has it, and works.
+
+### Known limitations
+
+- How z/OSMF refuses a user with no console authority at all has not been
+  tried. A command beyond the user's authority is answered by the console
+  (`IEE345I`) and shown as it is.
+
 ## 1.0.0 — 2026-09-30
 
 The first release with everything 0.9.0 listed under *Not yet* that belongs in
