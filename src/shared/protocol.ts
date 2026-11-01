@@ -12,6 +12,14 @@ export type PaneId = 'left' | 'right';
 export type PaneKind = 'local' | 'ds' | 'uss' | 'jes';
 
 /**
+ * How the panel looks: `standard` takes its colours from the VS Code theme,
+ * `neon` is a fixed dark palette with glowing accents.
+ */
+export type Theme = 'standard' | 'neon';
+
+export const THEMES: readonly Theme[] = ['standard', 'neon'];
+
+/**
  * Where a pane is pointing.
  *
  * `profile` is a Zowe profile name; it is empty for `local` and means "the
@@ -231,6 +239,8 @@ export type HostMessage =
   | { type: 'listing'; pane: PaneId; listing: ListingDto }
   /** The saved views changed — by Ctrl+D, or by an edit to `mc.favourites`. */
   | { type: 'favourites'; favourites: FavouriteDto[] }
+  /** `mc.theme` changed. The first one is in the page itself, not sent. */
+  | { type: 'theme'; theme: Theme }
   | { type: 'busy'; pane: PaneId; busy: boolean }
   /**
    * Whether the host is still working on something the user asked for. Unlike

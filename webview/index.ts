@@ -161,6 +161,9 @@ class App {
       case 'favourites':
         this.setFavourites(message.favourites);
         break;
+      case 'theme':
+        document.body.dataset.theme = message.theme;
+        break;
       case 'profiles':
         this.profiles = message.profiles;
         for (const pane of ['left', 'right'] as PaneId[]) this.panes[pane].setProfiles(this.profiles);

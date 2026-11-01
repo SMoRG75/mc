@@ -143,6 +143,7 @@ export class VirtualList {
     if (this.marked.has(entry.id)) row.classList.add('marked');
     if (entry.attention) row.classList.add('attention');
     if (entry.kind === 'up') row.classList.add('up');
+    if (entry.kind === 'dir') row.classList.add('dir');
 
     for (const column of this.columns) {
       const cell = document.createElement('span');

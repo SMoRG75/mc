@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **A neon theme**, `mc.theme: "neon"`: a dark panel with glowing accents —
+  the panes as cards with the active one lit, the path bar as an LED readout,
+  folders in cyan, each F-key in a colour of its own and the transfer bar in
+  LED segments. *Mainframe Commander: Switch Theme* flips between it and the
+  standard look, which still takes its colours from the VS Code theme. Either
+  takes effect at once in an open panel.
+
 ## 1.1.0 — 2026-10-24
 
 Everything 1.0 put off until "around 1.2": TSO and console commands on the

@@ -202,6 +202,9 @@ export class CommanderPanel {
         if (event.affectsConfiguration('mc.favourites')) {
           this.post({ type: 'favourites', favourites: settings.favourites() });
         }
+        if (event.affectsConfiguration('mc.theme')) {
+          this.post({ type: 'theme', theme: settings.theme() });
+        }
       }),
       panel.onDidDispose(() => this.dispose()),
     );
@@ -1057,7 +1060,7 @@ export class CommanderPanel {
 <link rel="stylesheet" href="${asset('style.css')}">
 <title>Mainframe Commander</title>
 </head>
-<body>
+<body data-theme="${settings.theme()}">
 <div id="app"></div>
 <script type="module" nonce="${nonce}" src="${asset('index.js')}"></script>
 </body>

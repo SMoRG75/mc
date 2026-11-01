@@ -2,8 +2,8 @@ import * as os from 'node:os';
 import * as vscode from 'vscode';
 import type { LogLevel } from './log';
 import {
-  sameLocation,
-  type FavouriteDto, type PaneId, type PaneKind, type PaneLocation, type TransferOptions,
+  sameLocation, THEMES,
+  type FavouriteDto, type PaneId, type PaneKind, type PaneLocation, type Theme, type TransferOptions,
 } from '../shared/protocol';
 
 /**
@@ -53,6 +53,17 @@ export const settings = {
   jesRefreshSeconds: (): number => settings.get('jes.autoRefreshSeconds', 10),
   ebcdicRecordLength: (): number => settings.get('view.ebcdicRecordLength', 80),
   logLevel: (): LogLevel => settings.get('log.level', 'info'),
+
+  /** Checked rather than cast: the value ends up in the page's markup. */
+  theme: (): Theme => {
+    const value = settings.get<unknown>('theme', 'standard');
+    return THEMES.includes(value as Theme) ? value as Theme : 'standard';
+  },
+
+  setTheme: async (theme: Theme): Promise<void> => {
+    const config = vscode.workspace.getConfiguration('mc');
+    await config.update('theme', theme, scopeOf(config, 'theme'));
+  },
 
   /** What Shift+F3 decodes with — the transfer codepage unless one is set here. */
   ebcdicCodepage: (): string => (

@@ -63,6 +63,10 @@
       {
         "command": "mc.showLog",
         "title": "Mainframe Commander: Show Log"
+      },
+      {
+        "command": "mc.toggleTheme",
+        "title": "Mainframe Commander: Switch Theme"
       }
     ],
     "menus": {
@@ -381,6 +385,19 @@
           "default": 80,
           "minimum": 1,
           "markdownDescription": "Record length `Shift+F3` splits on when the bytes carry no x'15' newline of their own — a data set read as records rather than as a stream. The data set's own LRECL is used when it is known; this only decides the case where it is not, such as a local file."
+        },
+        "mc.theme": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "neon"
+          ],
+          "enumDescriptions": [
+            "The colours of whatever VS Code theme you are running.",
+            "A dark panel with neon accents, whatever the VS Code theme."
+          ],
+          "default": "standard",
+          "markdownDescription": "How the panel looks. *Mainframe Commander: Switch Theme* flips between the two. Takes effect at once."
         },
         "mc.confirmDelete": {
           "type": "boolean",

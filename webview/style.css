@@ -1,6 +1,7 @@
 /*
  * The pane look is Total Commander; the colours are whatever VS Code theme the
- * user is running, so the panel never fights the rest of the editor.
+ * user is running, so the panel never fights the rest of the editor — unless
+ * `mc.theme` asks for neon, which is the section near the end.
  */
 :root {
   --row-height: 18px;
@@ -481,6 +482,195 @@ select.field option {
   border-color: transparent;
   font-weight: 600;
 }
+
+/* ---------- neon theme (mc.theme) ---------- */
+/*
+ * Everything above reads VS Code's own variables, so most of this theme is
+ * those same variables set again on <body>, where they shadow the ones VS Code
+ * puts on <html>. `--line` and the two after it are redefined too: they were
+ * resolved on :root, against VS Code's values. What follows the palette is the
+ * part no variable reaches — the glow, the LED segments, the coloured cards.
+ *
+ * The palette is fixed and dark whatever the VS Code theme is: neon on white
+ * reads as nothing at all.
+ */
+body[data-theme='neon'] {
+  --n-bg: #0e1218;
+  --n-card: #151a23;
+  --n-well: #0a0d12;
+  --n-edge: #2a3140;
+  --n-text: #d9dee8;
+  --n-dim: #8a93a6;
+  --n-green: #39ff6a;
+  --n-red: #ff4545;
+  --n-yellow: #ffd60a;
+  --n-orange: #ff9f1a;
+  --n-cyan: #19d3ff;
+  --n-blue: #3b8cff;
+  --n-magenta: #ff3df5;
+  --n-purple: #a970ff;
+
+  --vscode-foreground: var(--n-text);
+  --vscode-descriptionForeground: var(--n-dim);
+  --vscode-editor-background: var(--n-bg);
+  --vscode-sideBar-background: var(--n-card);
+  --vscode-sideBarSectionHeader-background: var(--n-well);
+  --vscode-panel-border: var(--n-edge);
+  --vscode-textLink-foreground: var(--n-cyan);
+  --vscode-focusBorder: var(--n-green);
+  --vscode-list-activeSelectionBackground: rgba(57, 255, 106, .2);
+  --vscode-list-activeSelectionForeground: #fff;
+  --vscode-list-inactiveSelectionBackground: rgba(255, 255, 255, .07);
+  --vscode-list-hoverBackground: rgba(255, 255, 255, .06);
+  --vscode-button-background: rgba(57, 255, 106, .18);
+  --vscode-button-foreground: var(--n-green);
+  --vscode-button-secondaryBackground: #1b212c;
+  --vscode-button-secondaryForeground: var(--n-text);
+  --vscode-dropdown-background: #1b212c;
+  --vscode-dropdown-listBackground: #1b212c;
+  --vscode-dropdown-foreground: var(--n-text);
+  --vscode-dropdown-border: var(--n-edge);
+  --vscode-input-background: var(--n-well);
+  --vscode-input-foreground: var(--n-text);
+  --vscode-input-border: var(--n-edge);
+  --vscode-editorWidget-background: var(--n-card);
+  --vscode-editorWidget-border: var(--n-magenta);
+  --vscode-statusBar-background: var(--n-well);
+  --vscode-statusBar-foreground: var(--n-dim);
+  --vscode-progressBar-background: var(--n-cyan);
+  --vscode-editorWarning-foreground: var(--n-yellow);
+  --vscode-editorError-foreground: var(--n-red);
+  --vscode-terminal-ansiGreen: var(--n-green);
+  --vscode-scrollbarSlider-background: rgba(138, 147, 166, .25);
+  --vscode-scrollbarSlider-hoverBackground: rgba(138, 147, 166, .4);
+  --vscode-scrollbarSlider-activeBackground: rgba(25, 211, 255, .5);
+
+  --line: var(--n-edge);
+  --marked: var(--n-yellow);
+  --attention: var(--n-red);
+
+  color-scheme: dark;
+  color: var(--n-text);
+  background: var(--n-bg);
+}
+
+/* The panes are cards with a gap between them, and the active one glows. */
+body[data-theme='neon'] .panes { gap: 6px; padding: 6px 6px 0; }
+body[data-theme='neon'] .pane {
+  border: 1px solid var(--n-green);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--n-card);
+  box-shadow: 0 0 10px rgba(57, 255, 106, .25), inset 0 0 18px rgba(57, 255, 106, .05);
+}
+body[data-theme='neon'] .pane.inactive { border-color: var(--n-edge); box-shadow: none; }
+
+/* The path bar is the LED readout in the card's corner. */
+body[data-theme='neon'] .pathbar {
+  margin: 5px 6px;
+  padding: 2px 8px;
+  border: 1px solid #0f3b47;
+  border-radius: 3px;
+  background: #051419;
+  color: var(--n-cyan);
+  letter-spacing: .06em;
+  text-shadow: 0 0 6px rgba(25, 211, 255, .65);
+}
+body[data-theme='neon'].filtering .pathbar,
+body[data-theme='neon'] .pathbar.editable {
+  border-color: #4a3d07;
+  background: #141003;
+  color: var(--n-yellow);
+  text-shadow: 0 0 6px rgba(255, 214, 10, .6);
+}
+body[data-theme='neon'] .pane.inactive .pathbar { opacity: .7; }
+
+body[data-theme='neon'] .seg span.on { text-shadow: 0 0 6px rgba(57, 255, 106, .7); }
+body[data-theme='neon'] .seg span.saved::before { color: var(--n-yellow); opacity: 1; }
+
+body[data-theme='neon'] .columns { color: var(--n-green); letter-spacing: .03em; }
+body[data-theme='neon'] .columns .cell.sorted,
+body[data-theme='neon'] .columns .cell.sortable:hover {
+  color: var(--n-orange);
+  text-shadow: 0 0 6px rgba(255, 159, 26, .6);
+}
+
+body[data-theme='neon'] .row.dir { color: var(--n-cyan); }
+body[data-theme='neon'] .row.up { color: var(--n-purple); }
+body[data-theme='neon'] .row.marked {
+  color: var(--n-yellow);
+  text-shadow: 0 0 6px rgba(255, 214, 10, .55);
+}
+body[data-theme='neon'] .row.cursor {
+  color: #fff;
+  box-shadow: 0 0 8px rgba(57, 255, 106, .35);
+}
+body[data-theme='neon'] .row.cursor.marked { color: var(--n-yellow); }
+body[data-theme='neon'] .pane.inactive .row.cursor { box-shadow: none; }
+
+body[data-theme='neon'] .pane-foot { text-shadow: 0 0 6px rgba(255, 214, 10, .4); }
+
+body[data-theme='neon'] .cmdline {
+  margin: 6px 6px 0;
+  border: 1px solid var(--n-edge);
+  border-radius: 4px;
+  background: var(--n-well);
+}
+body[data-theme='neon'] .cmdline .prompt { text-shadow: 0 0 6px rgba(57, 255, 106, .7); }
+body[data-theme='neon'] .cmdline input { caret-color: var(--n-green); }
+
+/* Each F-key its own colour, like the row of cards along the bottom of a
+   hardware monitor; the key name lights up in it. */
+body[data-theme='neon'] .fkeys { gap: 5px; padding: 6px; border-top: 0; }
+body[data-theme='neon'] .fk {
+  --accent: var(--n-cyan);
+  border-color: var(--accent);
+  border-radius: 4px;
+  background: var(--n-card);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+body[data-theme='neon'] .fk:nth-child(1) { --accent: var(--n-blue); }
+body[data-theme='neon'] .fk:nth-child(2) { --accent: var(--n-green); }
+body[data-theme='neon'] .fk:nth-child(3) { --accent: var(--n-cyan); }
+body[data-theme='neon'] .fk:nth-child(4) { --accent: var(--n-yellow); }
+body[data-theme='neon'] .fk:nth-child(5) { --accent: var(--n-green); }
+body[data-theme='neon'] .fk:nth-child(6) { --accent: var(--n-magenta); }
+body[data-theme='neon'] .fk:nth-child(7) { --accent: var(--n-cyan); }
+body[data-theme='neon'] .fk:nth-child(8) { --accent: var(--n-red); }
+body[data-theme='neon'] .fk:nth-child(9) { --accent: var(--n-orange); }
+body[data-theme='neon'] .fk:nth-child(10) { --accent: var(--n-purple); }
+body[data-theme='neon'] .fk b {
+  color: var(--accent);
+  text-shadow: 0 0 6px var(--accent);
+}
+body[data-theme='neon'] .fk:hover { background: color-mix(in srgb, var(--accent) 16%, var(--n-card)); }
+
+body[data-theme='neon'] .statusbar { border-top: 1px solid var(--n-edge); }
+
+/* The transfer bar as a row of LED segments: unlit ones behind, lit ones in front. */
+body[data-theme='neon'] .prog {
+  width: 160px;
+  height: 9px;
+  border: 0;
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, #0f3340 0 5px, transparent 5px 7px);
+}
+body[data-theme='neon'] .prog i {
+  background: repeating-linear-gradient(90deg, var(--n-cyan) 0 5px, transparent 5px 7px);
+  filter: drop-shadow(0 0 3px var(--n-cyan));
+}
+
+body[data-theme='neon'] .modal {
+  box-shadow: 0 0 18px rgba(255, 61, 245, .35), 0 12px 40px rgba(0, 0, 0, .6);
+}
+body[data-theme='neon'] .modal .mh {
+  color: var(--n-magenta);
+  letter-spacing: .04em;
+  text-shadow: 0 0 6px rgba(255, 61, 245, .6);
+}
+body[data-theme='neon'] .field:focus { outline: 1px solid var(--n-cyan); outline-offset: -1px; }
+body[data-theme='neon'] .btn.pri { border-color: var(--n-green); }
+body[data-theme='neon'] .modal.help h4 { text-shadow: 0 0 6px rgba(25, 211, 255, .6); }
 
 /* ---------- work in progress ---------- */
 /*

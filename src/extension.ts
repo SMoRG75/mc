@@ -41,6 +41,11 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     channel,
     vscode.commands.registerCommand('mc.showLog', () => channel.show(true)),
+    // Two themes, so switching is a toggle rather than a picker. It goes
+    // through the setting, which the open panel is already listening to.
+    vscode.commands.registerCommand('mc.toggleTheme', () => (
+      settings.setTheme(settings.theme() === 'neon' ? 'standard' : 'neon')
+    )),
     // Saving a member from an editor changes what the pane behind it is showing.
     bridge.onDidWrite((location) => CommanderPanel.locationChanged(location)),
     vscode.commands.registerCommand('mc.open', () => {
