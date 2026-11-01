@@ -1,9 +1,12 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { Writable } from 'node:stream';
+import { type Readable, Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type { AbstractSession, IProfArgAttrs } from '@zowe/imperative';
-import type { IListOptions, IZosFilesResponse } from '@zowe/zos-files-for-zowe-sdk';
+import {
+  CreateDataSetTypeEnum, type ICreateDataSetOptions, type IListOptions, type IZosFilesResponse,
+} from '@zowe/zos-files-for-zowe-sdk';
 import type { IDownloadSpoolContentParms, IJob, IJobFile } from '@zowe/zos-jobs-for-zowe-sdk';
 import { describeError, UserFacingError } from '../core/errors';
 import { log } from '../core/log';
@@ -52,18 +55,36 @@ interface LoadedProfile {
 }
 
 interface ContentOptions { stream?: Writable; binary?: boolean; encoding?: string }
+interface UploadOptions { binary?: boolean; encoding?: string; localEncoding?: string }
 
 interface RseMvs {
   getSession(): AbstractSession;
   dataSet(filter: string, options?: IListOptions): Promise<IZosFilesResponse>;
   allMembers(dataSetName: string, options?: IListOptions): Promise<IZosFilesResponse>;
   getContents(dataSetName: string, options: ContentOptions): Promise<IZosFilesResponse>;
+  uploadFromBuffer(buffer: Buffer, dataSetName: string, options: UploadOptions): Promise<IZosFilesResponse>;
+  putContents(file: string, dataSetName: string, options: UploadOptions): Promise<IZosFilesResponse>;
+  /** z/OSMF's names for the attributes, which the plug-in turns into RSE API's. */
+  createDataSet(
+    type: CreateDataSetTypeEnum, dataSetName: string, options: Partial<ICreateDataSetOptions>,
+  ): Promise<IZosFilesResponse>;
+  allocateLikeDataSet(dataSetName: string, likeDataSetName: string): Promise<IZosFilesResponse>;
+  deleteDataSet(dataSetName: string): Promise<IZosFilesResponse>;
+  renameDataSet(from: string, to: string): Promise<IZosFilesResponse>;
+  renameDataSetMember(dataSetName: string, from: string, to: string): Promise<IZosFilesResponse>;
+  hRecallDataSet(dataSetName: string): Promise<IZosFilesResponse>;
 }
 
 interface RseUss {
   fileList(path: string): Promise<IZosFilesResponse>;
   getContents(path: string, options: ContentOptions): Promise<IZosFilesResponse>;
   getTag(path: string): Promise<string>;
+  uploadFromBuffer(buffer: Buffer, path: string, options: UploadOptions): Promise<IZosFilesResponse>;
+  putContent(file: string, path: string, options: UploadOptions): Promise<IZosFilesResponse>;
+  create(path: string, type: string, mode?: string): Promise<IZosFilesResponse>;
+  delete(path: string, recursive?: boolean): Promise<IZosFilesResponse>;
+  /** `to` is the whole new path; only its last part is the new name. */
+  rename(from: string, to: string): Promise<IZosFilesResponse>;
 }
 
 interface RseJes {
@@ -72,6 +93,9 @@ interface RseJes {
   getSpoolContentById(jobname: string, jobid: string, spoolId: number): Promise<string>;
   getJclForJob(job: IJob): Promise<string>;
   downloadSingleSpool(parms: IDownloadSpoolContentParms): Promise<void>;
+  submitJob(dataSetName: string): Promise<IJob>;
+  submitJcl(jcl: string): Promise<IJob>;
+  deleteJob(jobname: string, jobid: string): Promise<void>;
 }
 
 let plugin: RsePlugin | undefined;
@@ -146,8 +170,8 @@ export function rseHost(profileName: string, args: IProfArgAttrs[]): ZosHost {
 }
 
 /**
- * The SDK calls, answered by the plug-in. Reading goes through — listing, F3,
- * copying off the host; changing anything is the next step and says so.
+ * The SDK calls, answered by the plug-in, mostly one for one. Where they are
+ * not, the comment says what the plug-in or RSE API does differently.
  */
 function rseApi(rse: RsePlugin, mvs: RseMvs, uss: RseUss, jes: RseJes): ZosApi {
   return {
@@ -172,31 +196,42 @@ function rseApi(rse: RsePlugin, mvs: RseMvs, uss: RseUss, jes: RseJes): ZosApi {
       ussFile: (_session, path, options) =>
         uss.getContents(path, { ...contentOptions(options), stream: options?.stream }),
     },
+    // The plug-in uploads from files, so a stream is put in one first.
     Upload: {
-      bufferToDataSet: notYet('Writing to a data set'),
-      streamToDataSet: notYet('Writing to a data set'),
-      bufferToUssFile: notYet('Writing to a USS file'),
-      streamToUssFile: notYet('Writing to a USS file'),
+      bufferToDataSet: async (_session, buffer, dataSetName, options) =>
+        uploaded(await mvs.uploadFromBuffer(buffer, dataSetName, uploadOptions(options))),
+      streamToDataSet: (_session, stream, dataSetName, options) =>
+        spooled(stream, async (file) => uploaded(await mvs.putContents(file, dataSetName, uploadOptions(options)))),
+      bufferToUssFile: async (_session, path, buffer, options) =>
+        uploaded(await uss.uploadFromBuffer(buffer, path, ussUploadOptions(options))),
+      streamToUssFile: (_session, path, stream, options) =>
+        spooled(stream, async (file) => uploaded(await uss.putContent(file, path, ussUploadOptions(options)))),
     },
     Create: {
-      dataSet: notYet('Allocating a data set'),
-      dataSetLike: notYet('Allocating a data set'),
-      uss: notYet('Making a USS directory'),
+      dataSet: (_session, type, dataSetName, options) =>
+        mvs.createDataSet(type, dataSetName, organised(type, options)),
+      // RSE API takes the classes along from the model; there is no saying otherwise.
+      dataSetLike: (_session, dataSetName, likeDataSetName) => mvs.allocateLikeDataSet(dataSetName, likeDataSetName),
+      uss: (_session, path, type, mode) => uss.create(path, type, mode),
     },
     Delete: {
-      dataSet: notYet('Deleting'),
-      ussFile: notYet('Deleting'),
+      dataSet: (_session, dataSetName) => mvs.deleteDataSet(dataSetName),
+      ussFile: (_session, path, recursive) => uss.delete(path, recursive),
     },
     Rename: {
-      dataSet: notYet('Renaming'),
-      dataSetMember: notYet('Renaming'),
+      dataSet: (_session, from, to) => mvs.renameDataSet(from, to),
+      dataSetMember: (_session, dataSetName, from, to) => mvs.renameDataSetMember(dataSetName, from, to),
     },
     HRecall: {
-      dataSet: notYet('Recalling a data set'),
+      // RSE API has no waiting for the recall; the provider asks until it is back.
+      dataSet: (_session, dataSetName) => mvs.hRecallDataSet(dataSetName),
     },
     Utilities: {
       applyTaggedEncoding: async (_session, path, options) => applyTag(await uss.getTag(path), options),
-      renameUSSFile: notYet('Renaming'),
+      renameUSSFile: async (_session, from, to) => {
+        await uss.rename(from, to);
+        return Buffer.alloc(0);
+      },
     },
     GetJobs: {
       getJobsCommon: (_session, parms) => jes.getJobsByParameters({
@@ -212,12 +247,18 @@ function rseApi(rse: RsePlugin, mvs: RseMvs, uss: RseUss, jes: RseJes): ZosApi {
       downloadSpoolContentCommon: (_session, parms) => jes.downloadSingleSpool(parms),
     },
     DeleteJobs: {
-      deleteJob: notYet('Purging a job'),
+      deleteJob: async (_session, jobname, jobid) => {
+        await jes.deleteJob(jobname, jobid);
+        return undefined;
+      },
     },
     SubmitJobs: {
-      submitJob: notYet('Submitting'),
-      submitJcl: notYet('Submitting'),
-      submitUSSJob: notYet('Submitting'),
+      submitJob: (_session, dataSetName) => jes.submitJob(dataSetName),
+      submitJcl: (_session, jcl) => jes.submitJcl(jcl),
+      // RSE API submits from a data set or from JCL, not from a USS file; so
+      // the file is read and its JCL sent.
+      submitUSSJob: async (_session, path) =>
+        jes.submitJcl((await collect((stream) => uss.getContents(path, { stream }))).toString('utf8')),
     },
   };
 }
@@ -254,6 +295,17 @@ function contentOptions(options?: { binary?: boolean; encoding?: string }): Cont
   return options?.binary ? { binary: true } : { encoding: options?.encoding };
 }
 
+/**
+ * The same, for a USS file. Asked for text, the plug-in still looks at the
+ * bytes, and a NUL among them sends the file up as binary — tagged with the
+ * code page all the same, so it reads back as garbage. Saying what the bytes
+ * are is the one way to make it take the word for it, and they are UTF-8: that
+ * is what mc hands over as text.
+ */
+function ussUploadOptions(options?: { binary?: boolean; encoding?: string }): UploadOptions {
+  return options?.binary ? { binary: true } : { encoding: options?.encoding, localEncoding: 'UTF-8' };
+}
+
 /** A download into memory, for the SDK calls that answer with the content itself. */
 async function collect(download: (stream: Writable) => Promise<unknown>): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -282,11 +334,46 @@ export function applyTag(tag: string, options: { binary?: boolean; encoding?: st
   if (ebcdic) options.encoding = ebcdic[0].toUpperCase();
 }
 
-function notYet(what: string): () => Promise<never> {
-  return async () => {
-    throw new UserFacingError(
-      `${what} does not go through RSE in mc yet.`,
-      'Over an rse profile mc lists, shows and copies off the host for now. Use a zosmf profile for this.',
-    );
+/** Only what decides how the bytes go up; the rest of the SDK's options mean nothing to RSE. */
+function uploadOptions(options?: { binary?: boolean; encoding?: string }): UploadOptions {
+  return options?.binary ? { binary: true } : { encoding: options?.encoding };
+}
+
+/**
+ * The plug-in answers a failed upload rather than throwing it, and it writes
+ * records too long for the data set cut short rather than refuse them.
+ */
+function uploaded(response: IZosFilesResponse): IZosFilesResponse {
+  const said = response.commandResponse ?? '';
+  if (!response.success || /truncated/i.test(said)) {
+    throw new UserFacingError(said || 'The upload through RSE API failed.');
+  }
+  return response;
+}
+
+/** A stream written to a file of its own for the time `use` takes. */
+async function spooled<T>(stream: Readable, use: (file: string) => Promise<T>): Promise<T> {
+  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mc-rse-'));
+  try {
+    const file = path.join(dir, 'upload');
+    await pipeline(stream, fs.createWriteStream(file));
+    return await use(file);
+  } finally {
+    await fs.promises.rm(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * The SDK takes the organisation from the type; the plug-in only from the
+ * attributes, and a partitioned one without a DSNTYPE is not one RSE API knows.
+ */
+function organised(
+  type: CreateDataSetTypeEnum, options?: Partial<ICreateDataSetOptions>,
+): Partial<ICreateDataSetOptions> {
+  const sequential = type === CreateDataSetTypeEnum.DATA_SET_SEQUENTIAL;
+  return {
+    ...options,
+    dsorg: sequential ? 'PS' : 'PO',
+    ...(sequential ? {} : { dsntype: options?.dsntype ?? 'PDS' }),
   };
 }

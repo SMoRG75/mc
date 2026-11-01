@@ -10,12 +10,16 @@
   takes effect at once in an open panel.
 - **Ctrl+L goes to the command line**, as to a browser's address bar. Esc
   gives the keyboard back to the pane, as before.
-- **RSE API profiles, for reading.** An `rse` Zowe profile now sits beside
-  the `zosmf` ones in the DS, USS and JES panes' profile selector, and lists,
-  F3 and copying off the host go through IBM's RSE API. It needs IBM's RSE
-  API plug-in for Zowe CLI (`zowe plugins install @ibm/rse-api-for-zowe-cli`),
-  which mc uses where Zowe CLI installed it and does not ship. Writing over
-  RSE comes next; until then it says so and points at a zosmf profile.
+- **RSE API profiles.** An `rse` Zowe profile now sits beside the `zosmf`
+  ones in the DS, USS and JES panes' profile selector, and everything those
+  panes do goes through IBM's RSE API: listing, F3, saving, copying and
+  moving both ways, F7, F8, renaming, recall, submitting and purging. It
+  needs IBM's RSE API plug-in for Zowe CLI
+  (`zowe plugins install @ibm/rse-api-for-zowe-cli`), which mc uses where
+  Zowe CLI installed it and does not ship. Where RSE API differs: a text file
+  written to USS is tagged with its code page, an allocation takes no volume
+  or SMS classes (LIKE still brings the model's), and members have no ISPF
+  statistics. TSO and console commands still need a zosmf profile.
 - A pane whose listing fails in another world or on another profile now
   shows that world's header, so the profile selector can take it off a
   profile that does not work.
