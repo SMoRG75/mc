@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { randomBytes } from 'node:crypto';
 import {
   reportsProgress,
-  type ClientMessage, type HostMessage, type PaneId, type PaneKind, type PaneLocation,
+  type ClientMessage, type HostMessage, type ListingDto, type PaneId, type PaneKind, type PaneLocation,
   type SearchHitDto, type SearchQuery, type TransferJobDto, type TransferOptions,
 } from './shared/protocol';
 import type { Entry, PaneProvider, ProviderRegistry } from './core/provider';
@@ -71,6 +71,8 @@ interface PaneState {
   restore?: string;
   /** Cancels the in-flight listing when the user navigates away from it. */
   inFlight?: AbortController;
+  /** Where the webview's header stands: the last location it was sent. */
+  shown?: PaneLocation;
 }
 
 /**
@@ -255,8 +257,10 @@ export class CommanderPanel {
           const here = state.location;
           // The root of a world, on the profile the pane is already using: what
           // a world it has never been to opens on, and what a second press
-          // means once it is there.
-          const root: PaneLocation = { kind: msg.kind, profile: here.profile, path: '' };
+          // means once it is there. A profile the new world cannot be on gives
+          // way to that world's default.
+          const profile = await this.sessions.fits(msg.kind, here.profile) ? here.profile : '';
+          const root: PaneLocation = { kind: msg.kind, profile, path: '' };
           this.goTo(msg.pane, here.kind === msg.kind
             ? root
             : state.lastByKind[msg.kind] ?? root);
@@ -423,11 +427,21 @@ export class CommanderPanel {
           cursor: state.restore,
         },
       });
+      state.shown = state.location;
       state.restore = undefined;
       this.rememberPanes();
     } catch (err) {
       if (controller.signal.aborted) return;
       const { message, detail } = describeError(err);
+      // A world or profile that cannot be listed still has to be the one the
+      // header shows. Left on the last one, the profile selector offers the
+      // profile the pane already seems to be on, and there is no way off the
+      // one that fails.
+      if (state.shown?.kind !== state.location.kind || state.shown.profile !== state.location.profile) {
+        this.post({ type: 'listing', pane, listing: emptyListing(state.location) });
+        state.shown = state.location;
+        state.entries = [];
+      }
       this.post({ type: 'error', pane, message, detail });
     } finally {
       if (!controller.signal.aborted) this.post({ type: 'busy', pane, busy: false });
@@ -1106,6 +1120,19 @@ async function askConflict(name: string, where: string, many: boolean): Promise<
  */
 function nonceOf(bytes: number): string {
   return randomBytes(bytes).toString('base64');
+}
+
+/** A place with nothing to show and nothing to be done there, for a listing that failed. */
+function emptyListing(location: PaneLocation): ListingDto {
+  return {
+    location,
+    title: location.path,
+    columns: [],
+    entries: [],
+    status: '',
+    truncated: false,
+    capabilities: { write: false, delete: false, rename: false, create: false, submit: false },
+  };
 }
 
 export function transferDefaults(): TransferOptions {

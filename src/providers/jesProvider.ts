@@ -1,5 +1,4 @@
 import type { Writable } from 'node:stream';
-import { DeleteJobs, DownloadJobs, GetJobs, SubmitJobs } from '@zowe/zos-jobs-for-zowe-sdk';
 import type { IJob, IJobFile } from '@zowe/zos-jobs-for-zowe-sdk';
 import type { AbstractSession } from '@zowe/imperative';
 import type {
@@ -58,7 +57,7 @@ export class JesProvider implements PaneProvider {
   }
 
   async list(loc: PaneLocation, signal: AbortSignal): Promise<Listing> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     const parsed = parseLocation(loc);
     signal.throwIfAborted();
 
@@ -68,7 +67,7 @@ export class JesProvider implements PaneProvider {
       // typed by hand into `mc.panes.*` or on the command line works too.
       const owner = (parsed.owner || this.settings.defaultOwner()).trim().toUpperCase() || user || '*';
       const prefix = parsed.prefix.trim().toUpperCase() || '*';
-      const jobs = await GetJobs.getJobsCommon(session, {
+      const jobs = await api.GetJobs.getJobsCommon(session, {
         owner,
         prefix,
         ...(parsed.status === 'all' ? {} : { status: parsed.status.toUpperCase() }),
@@ -103,7 +102,7 @@ export class JesProvider implements PaneProvider {
       };
     }
 
-    const files = await GetJobs.getSpoolFiles(session, parsed.job.jobname, parsed.job.jobid) as ZosmfSpoolFile[];
+    const files = await api.GetJobs.getSpoolFiles(session, parsed.job.jobname, parsed.job.jobid) as ZosmfSpoolFile[];
     signal.throwIfAborted();
     const { jobname, jobid } = parsed.job;
 
@@ -229,13 +228,13 @@ export class JesProvider implements PaneProvider {
   }
 
   async read(loc: PaneLocation, entry: Entry, options: TransferOptions): Promise<Buffer> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     const ref = entry.ref as JesRef;
     // Spool output is EBCDIC like everything else; the JCL endpoint takes no
     // encoding, so that one stays on the service default.
     const content = ref.kind === 'spool'
-      ? await GetJobs.getSpoolContentById(session, ref.jobname, ref.jobid, ref.spoolId, options.codepage)
-      : await GetJobs.getJcl(session, ref.jobname, ref.jobid);
+      ? await api.GetJobs.getSpoolContentById(session, ref.jobname, ref.jobid, ref.spoolId, options.codepage)
+      : await api.GetJobs.getJcl(session, ref.jobname, ref.jobid);
     // This is the editor's copy, and nothing in JES can be written back, so
     // control characters can become dots without losing anything. F5 streams
     // through readTo and keeps the bytes as they are.
@@ -258,13 +257,13 @@ export class JesProvider implements PaneProvider {
       });
       return;
     }
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     // Only the fields the download builds its URL from; the rest of an IJobFile
     // describes the spool file, which the SDK has no use for here.
     const jobFile = {
       jobname: ref.jobname, jobid: ref.jobid, id: ref.spoolId, ddname: ref.ddname,
     } as IJobFile;
-    await pacedDownload(sink, signal, (stream) => DownloadJobs.downloadSpoolContentCommon(session, {
+    await pacedDownload(sink, signal, (stream) => api.DownloadJobs.downloadSpoolContentCommon(session, {
       jobFile, stream, encoding: options.codepage,
     }));
   }
@@ -286,13 +285,13 @@ export class JesProvider implements PaneProvider {
 
   /** F8 purges the job. Purging a single spool DD is not a thing JES offers. */
   async remove(loc: PaneLocation, entries: Entry[]): Promise<void> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     for (const entry of entries) {
       const ref = entry.ref as JesRef;
       if (ref.kind !== 'job') {
         throw new UserFacingError('A single spool file cannot be deleted — only the whole job.');
       }
-      await DeleteJobs.deleteJob(session, ref.jobname, ref.jobid);
+      await api.DeleteJobs.deleteJob(session, ref.jobname, ref.jobid);
     }
   }
 
@@ -306,12 +305,12 @@ export class JesProvider implements PaneProvider {
 
   /** F9 on a job resubmits its JCL unchanged. */
   async submit(loc: PaneLocation, entries: Entry[]): Promise<string[]> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     const ids: string[] = [];
     for (const entry of entries) {
       const ref = entry.ref as JesRef;
-      const jcl = await GetJobs.getJcl(session, ref.jobname, ref.jobid);
-      const job = await SubmitJobs.submitJcl(session, String(jcl));
+      const jcl = await api.GetJobs.getJcl(session, ref.jobname, ref.jobid);
+      const job = await api.SubmitJobs.submitJcl(session, String(jcl));
       ids.push(job.jobid);
     }
     return ids;

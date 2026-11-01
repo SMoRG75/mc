@@ -6,6 +6,7 @@ import { Session } from '@zowe/imperative';
 import { redact } from '../src/core/log';
 import { UssProvider } from '../src/providers/ussProvider';
 import type { SessionManager } from '../src/zowe/sessions';
+import { ZOSMF_API } from '../src/zowe/zosApi';
 
 /**
  * A z/OSMF that answers USS listings from a directory of `size` entries, the
@@ -28,7 +29,7 @@ async function zosmf(size: number) {
     protocol: 'http', type: 'basic', user: 'u', password: 'p', rejectUnauthorized: false,
   });
   const sessions = {
-    session: async () => session,
+    host: async () => ({ type: 'zosmf', session, api: ZOSMF_API }),
     fileService: <T>(_session: unknown, call: () => Promise<T>) => call(),
   };
   const uss = new UssProvider(sessions as unknown as SessionManager, {

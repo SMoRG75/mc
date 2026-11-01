@@ -190,7 +190,37 @@ export interface ProfileDto {
   name: string;
   type: string;
   host?: string;
+  /** The default profile of its type, which is not the same as of its world. */
   isDefault: boolean;
+}
+
+/**
+ * The Zowe profile types a pane in each world can be on, in order of
+ * preference: an empty profile in a location means the default profile of the
+ * first of them that has one. The z/OS worlds go in through z/OSMF or IBM's
+ * RSE API; a world of its own (MQ) is an entry here plus the code that talks
+ * to it.
+ */
+export const PROFILE_TYPES: Readonly<Record<PaneKind, readonly string[]>> = {
+  local: [],
+  ds: ['zosmf', 'rse'],
+  uss: ['zosmf', 'rse'],
+  jes: ['zosmf', 'rse'],
+};
+
+/** The profiles a pane in `kind` can be on — what its profile selector lists. */
+export function profilesFor(kind: PaneKind, profiles: readonly ProfileDto[]): ProfileDto[] {
+  const types = PROFILE_TYPES[kind];
+  return profiles.filter((profile) => types.includes(profile.type));
+}
+
+/** What an empty profile in `kind` stands for, if anything. */
+export function defaultProfileFor(kind: PaneKind, profiles: readonly ProfileDto[]): ProfileDto | undefined {
+  for (const type of PROFILE_TYPES[kind]) {
+    const found = profiles.find((profile) => profile.type === type && profile.isDefault);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 /** Alt+F7: what to look for, below where the pane is standing. */

@@ -1,8 +1,15 @@
 import { ProfileInfo, type AbstractSession, type IProfArgAttrs, type IProfAttrs } from '@zowe/imperative';
-import type { ProfileDto } from '../shared/protocol';
+import { PROFILE_TYPES, type PaneKind, type ProfileDto } from '../shared/protocol';
 import { UserFacingError } from '../core/errors';
 import { log } from '../core/log';
 import { Serializer } from '../core/serial';
+import { rseHost } from './rse';
+import { ZOSMF_API, type ZosHost } from './zosApi';
+
+const ZOSMF = 'zosmf';
+
+/** Every profile type some world can be on, each once. */
+const KNOWN_TYPES = [...new Set(Object.values(PROFILE_TYPES).flat())];
 
 /**
  * Owns the connection to z/OS.
@@ -20,6 +27,7 @@ export class SessionManager {
    * caching only the finished session let each of them build its own.
    */
   private readonly sessions = new Map<string, Promise<AbstractSession>>();
+  private readonly hosts = new Map<string, Promise<ZosHost>>();
   private readonly fileServices = new Serializer();
   private readonly tsoCommands = new Serializer();
   private readonly consoleCommands = new Serializer();
@@ -68,6 +76,7 @@ export class SessionManager {
     log.debug('Zowe configuration changed; profiles will be read again.');
     this.info = undefined;
     this.sessions.clear();
+    this.hosts.clear();
   }
 
   private profileInfo(): Promise<ProfileInfo> {
@@ -83,41 +92,87 @@ export class SessionManager {
     return this.info;
   }
 
+  /** Every profile some world can be on; each pane picks out its own. */
   async profiles(): Promise<ProfileDto[]> {
     const info = await this.profileInfo();
-    const defaultProfile = info.getDefaultProfile('zosmf');
-    return info.getAllProfiles('zosmf').map((attrs) => ({
-      name: attrs.profName,
-      type: attrs.profType,
-      host: this.readArg(info, attrs, 'host'),
-      isDefault: attrs.profName === defaultProfile?.profName,
-    }));
+    return KNOWN_TYPES.flatMap((type) => {
+      const defaultProfile = info.getDefaultProfile(type);
+      return info.getAllProfiles(type).map((attrs) => ({
+        name: attrs.profName,
+        type: attrs.profType,
+        host: this.readArg(info, attrs, 'host'),
+        isDefault: attrs.profName === defaultProfile?.profName,
+      }));
+    });
   }
 
-  /** The session for a profile name; empty name means the default profile. */
+  /**
+   * Whether a pane in `kind` can be on `profileName`. The empty name — the
+   * default — always can, and so can a name that is not there at all: that is
+   * for the listing to say, the way it does today.
+   */
+  async fits(kind: PaneKind, profileName: string): Promise<boolean> {
+    if (!profileName) return true;
+    const profile = (await this.profiles()).find((p) => p.name === profileName);
+    return !profile || PROFILE_TYPES[kind].includes(profile.type);
+  }
+
+  /**
+   * The way into z/OS for a pane in `kind` on `profileName`: the z/OSMF SDKs
+   * for a zosmf profile, IBM's RSE client for an rse one. The empty name is
+   * the default profile of the first type the world takes that has one.
+   */
+  host(kind: PaneKind, profileName: string): Promise<ZosHost> {
+    return memo(this.hosts, `${kind}\u0000${profileName}`, () => this.createHost(kind, profileName));
+  }
+
+  /**
+   * The z/OSMF session for a profile name; empty name means the default
+   * z/OSMF profile. What the TSO and console commands go through, and the
+   * providers on a zosmf profile.
+   */
   session(profileName: string): Promise<AbstractSession> {
-    const cached = this.sessions.get(profileName);
-    if (cached) return cached;
-    const session = this.createSession(profileName);
-    this.sessions.set(profileName, session);
-    // A failure is not cached: the user fixes the profile and presses F2.
-    session.catch(() => {
-      if (this.sessions.get(profileName) === session) this.sessions.delete(profileName);
-    });
-    return session;
+    return memo(this.sessions, profileName, () => this.createSession(profileName));
+  }
+
+  private async createHost(kind: PaneKind, profileName: string): Promise<ZosHost> {
+    const info = await this.profileInfo();
+    const types = PROFILE_TYPES[kind];
+    const attrs = profileName
+      ? types.flatMap((type) => info.getAllProfiles(type)).find((p) => p.profName === profileName)
+      : types.map((type) => info.getDefaultProfile(type)).find((p) => p !== null);
+
+    // z/OSMF's own path, cache and all — which is also what tells the user
+    // about a profile that is not there.
+    if (!attrs || attrs.profType === ZOSMF) {
+      return { type: ZOSMF, session: await this.session(attrs?.profName ?? profileName), api: ZOSMF_API };
+    }
+
+    const merged = info.mergeArgsForProfile(attrs, { getSecureVals: true });
+    assertHasCredentials(merged.knownArgs, attrs.profName);
+    const host = rseHost(attrs.profName, merged.knownArgs);
+    logConnection(attrs.profName, host.session, 'RSE API');
+    return host;
   }
 
   private async createSession(profileName: string): Promise<AbstractSession> {
     const info = await this.profileInfo();
     const attrs = profileName
-      ? info.getAllProfiles('zosmf').find((p) => p.profName === profileName)
-      : info.getDefaultProfile('zosmf');
+      ? info.getAllProfiles(ZOSMF).find((p) => p.profName === profileName)
+      : info.getDefaultProfile(ZOSMF);
 
     if (!attrs) {
+      // A profile of another type by that name is a profile mc cannot use here
+      // yet, which is not the same as no profile at all.
+      const other = profileName
+        ? KNOWN_TYPES.flatMap((type) => info.getAllProfiles(type)).find((p) => p.profName === profileName)
+        : undefined;
       throw new UserFacingError(
-        profileName
-          ? `The Zowe profile '${profileName}' does not exist.`
-          : 'There is no default zosmf profile.',
+        other
+          ? `The Zowe profile '${profileName}' is a ${other.profType} profile, and this needs a ${ZOSMF} one.`
+          : profileName
+            ? `The Zowe profile '${profileName}' does not exist.`
+            : `There is no default ${ZOSMF} profile.`,
         'Run `zowe config init`, or pick another profile in the pane\'s profile selector.',
       );
     }
@@ -125,11 +180,7 @@ export class SessionManager {
     const merged = info.mergeArgsForProfile(attrs, { getSecureVals: true });
     assertHasCredentials(merged.knownArgs, attrs.profName);
     const session = ProfileInfo.createSession(merged.knownArgs);
-    const s = session.ISession;
-    // Where, and as whom — never with what: the password and token stay out.
-    log.info(`Profile '${attrs.profName}': ${s.protocol ?? 'https'}://${s.hostname}:${s.port}`
-      + `${s.basePath ?? ''} as ${s.user ?? '(certificate or token)'}, ${s.type ?? 'basic'} auth`
-      + `${s.rejectUnauthorized === false ? ', certificates not checked' : ''}`);
+    logConnection(attrs.profName, session, 'z/OSMF');
     return session;
   }
 
@@ -143,6 +194,29 @@ export class SessionManager {
       return undefined;
     }
   }
+}
+
+/**
+ * One promise per key, shared by everyone who asks while it is pending. A
+ * failure is not kept: the user fixes the profile and presses F2.
+ */
+function memo<T>(cache: Map<string, Promise<T>>, key: string, create: () => Promise<T>): Promise<T> {
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const made = create();
+  cache.set(key, made);
+  made.catch(() => {
+    if (cache.get(key) === made) cache.delete(key);
+  });
+  return made;
+}
+
+/** Where, and as whom — never with what: the password and token stay out. */
+function logConnection(profileName: string, session: AbstractSession, through: string): void {
+  const s = session.ISession;
+  log.info(`Profile '${profileName}' (${through}): ${s.protocol ?? 'https'}://${s.hostname}:${s.port}`
+    + `${s.basePath ? `/${s.basePath.replace(/^\//, '')}` : ''} as ${s.user ?? '(certificate or token)'}, `
+    + `${s.type ?? 'basic'} auth${s.rejectUnauthorized === false ? ', certificates not checked' : ''}`);
 }
 
 /**

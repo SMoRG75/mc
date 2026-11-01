@@ -1,6 +1,7 @@
-import type {
-  Capabilities, EntryDto, FavouriteDto, FilterDto, ListingDto, PaneId, PaneKind, PaneLocation,
-  ProfileDto, ViewDto,
+import {
+  defaultProfileFor, profilesFor,
+  type Capabilities, type EntryDto, type FavouriteDto, type FilterDto, type ListingDto, type PaneId,
+  type PaneKind, type PaneLocation, type ProfileDto, type ViewDto,
 } from '../src/shared/protocol';
 import { VirtualList } from './virtualList';
 
@@ -116,6 +117,12 @@ export class Pane {
 
   setProfiles(profiles: ProfileDto[]): void {
     this.profiles = profiles;
+    this.renderProfiles(this.listing?.location.kind ?? 'local');
+  }
+
+  /** Fills the selector with the profiles a pane in `kind` can be on. */
+  private renderProfiles(kind: PaneKind): void {
+    const profiles = profilesFor(kind, this.profiles);
     this.profileSelect.replaceChildren(
       ...profiles.map((profile) => {
         const option = document.createElement('option');
@@ -141,7 +148,9 @@ export class Pane {
    * (a renamed profile, or a listing that arrived before the list did).
    */
   private showProfile(profile: string): void {
-    const name = profile || this.profiles.find((p) => p.isDefault)?.name || this.profiles[0]?.name || '';
+    const kind = this.listing?.location.kind ?? 'local';
+    const name = profile || defaultProfileFor(kind, this.profiles)?.name
+      || profilesFor(kind, this.profiles)[0]?.name || '';
     // Against the options rather than the profile list: every refresh comes
     // through here, and the placeholder must not be added a second time.
     if (name && ![...this.profileSelect.options].some((o) => o.value === name)) {
@@ -176,9 +185,11 @@ export class Pane {
       || this.listing?.location.kind !== listing.location.kind
       || this.listing?.location.profile !== listing.location.profile;
 
+    const kindChanged = this.listing?.location.kind !== listing.location.kind;
     this.listing = listing;
     this.marked.clear();
     this.filter = '';
+    if (kindChanged) this.renderProfiles(listing.location.kind);
     this.showProfile(listing.location.profile);
     this.profileSelect.classList.toggle('hidden', listing.location.kind === 'local');
     this.renderKindTabs(listing.location.kind);

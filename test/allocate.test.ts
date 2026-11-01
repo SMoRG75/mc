@@ -8,6 +8,7 @@ import type { PaneProvider } from '../src/core/provider';
 import { DsProvider } from '../src/providers/dsProvider';
 import type { DatasetSpec } from '../src/shared/protocol';
 import type { SessionManager } from '../src/zowe/sessions';
+import { ZOSMF_API } from '../src/zowe/zosApi';
 
 /**
  * A z/OSMF whose SMS refuses any allocation in cylinders, as IBM Z Xplore's
@@ -45,7 +46,7 @@ async function zosmf() {
     protocol: 'http', type: 'basic', user: 'user', password: 'p', rejectUnauthorized: false,
   });
   const sessions = {
-    session: async () => session,
+    host: async () => ({ type: 'zosmf', session, api: ZOSMF_API }),
     fileService: <T>(_session: unknown, call: () => Promise<T>) => call(),
   };
   const ds = new DsProvider(sessions as unknown as SessionManager, {

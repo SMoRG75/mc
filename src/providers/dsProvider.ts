@@ -1,8 +1,6 @@
 import { pipeline, type Readable, type Writable } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
-import {
-  Create, CreateDataSetTypeEnum, Delete, Download, Get, HRecall, List, Rename, Upload,
-} from '@zowe/zos-files-for-zowe-sdk';
+import { CreateDataSetTypeEnum } from '@zowe/zos-files-for-zowe-sdk';
 import type { ICreateDataSetOptions, IZosFilesResponse } from '@zowe/zos-files-for-zowe-sdk';
 import type { AbstractSession } from '@zowe/imperative';
 import type {
@@ -15,6 +13,7 @@ import { log } from '../core/log';
 import { spooled } from '../core/spool';
 import { fitToRecordLength, RecordFitter, resolveMode } from '../core/text';
 import { pacedDownload, pacedUpload } from '../zowe/flow';
+import type { ZosHost } from '../zowe/zosApi';
 
 export interface DsSettings {
   pageSize: () => number;
@@ -88,12 +87,12 @@ export class DsProvider implements PaneProvider {
   }
 
   async list(loc: PaneLocation, signal: AbortSignal, options?: ListOptions): Promise<Listing> {
-    const session = await this.sessions.session(loc.profile);
+    const host = await this.sessions.host(this.kind, loc.profile);
     signal.throwIfAborted();
     const limit = options?.all ? Infinity : this.settings.pageSize();
     return isFilter(loc.path)
-      ? this.listDataSets(session, loc.path || this.defaultFilter(session), limit, signal)
-      : this.listMembers(session, loc.path, limit, signal);
+      ? this.listDataSets(host, loc.path || this.defaultFilter(host.session), limit, signal)
+      : this.listMembers(host, loc.path, limit, signal);
   }
 
   /**
@@ -112,9 +111,9 @@ export class DsProvider implements PaneProvider {
   }
 
   private async listDataSets(
-    session: AbstractSession, filter: string, limit: number, signal: AbortSignal,
+    host: ZosHost, filter: string, limit: number, signal: AbortSignal,
   ): Promise<Listing> {
-    const { response, withAttributes } = await this.listWithAttributeFallback(session, filter, limit, signal);
+    const { response, withAttributes } = await this.listWithAttributeFallback(host, filter, limit, signal);
     signal.throwIfAborted();
     const items = (response.apiResponse?.items ?? []) as ZosmfDataSet[];
 
@@ -169,14 +168,14 @@ export class DsProvider implements PaneProvider {
    * re-thrown only if the plain listing fails too, since that one is real.
    */
   private async listWithAttributeFallback(
-    session: AbstractSession, filter: string, limit: number, signal: AbortSignal,
+    { session, api }: ZosHost, filter: string, limit: number, signal: AbortSignal,
   ): Promise<{ response: IZosFilesResponse; withAttributes: boolean }> {
     // No more than the pane shows, and one to tell whether there was more:
     // z/OSMF builds the list in TSO and gives up on it after 30 seconds.
     const cap = capped(limit);
     try {
       const response = await this.sessions.fileService(session, () =>
-        List.dataSet(session, filter, { attributes: true, ...cap }), signal);
+        api.List.dataSet(session, filter, { attributes: true, ...cap }), signal);
       return { response, withAttributes: true };
     } catch (rich) {
       // Skipped in the queue because the pane moved on: nothing failed.
@@ -187,7 +186,7 @@ export class DsProvider implements PaneProvider {
       log.warn(`Listing '${filter}' with attributes failed; listing it without them: ${message}`, detail);
       try {
         const response = await this.sessions.fileService(session, () =>
-          List.dataSet(session, filter, cap), signal);
+          api.List.dataSet(session, filter, cap), signal);
         return { response, withAttributes: false };
       } catch {
         throw explainListFailure(rich, filter);
@@ -196,12 +195,13 @@ export class DsProvider implements PaneProvider {
   }
 
   private async listMembers(
-    session: AbstractSession, dsname: string, limit: number, signal: AbortSignal,
+    host: ZosHost, dsname: string, limit: number, signal: AbortSignal,
   ): Promise<Listing> {
+    const { session, api } = host;
     const [members, attributes] = await Promise.all([
       this.sessions.fileService(session, () =>
-        List.allMembers(session, dsname, { attributes: true, ...capped(limit) }), signal),
-      this.attributes(session, dsname).catch(() => undefined),
+        api.List.allMembers(session, dsname, { attributes: true, ...capped(limit) }), signal),
+      this.attributes(host, dsname).catch(() => undefined),
     ]);
     signal.throwIfAborted();
 
@@ -288,17 +288,17 @@ export class DsProvider implements PaneProvider {
    * into something else entirely.
    */
   async read(loc: PaneLocation, entry: Entry, options: TransferOptions): Promise<Buffer> {
-    const session = await this.sessions.session(loc.profile);
-    return Get.dataSet(session, qualify(entry.ref as DsRef), this.readOptions(loc, entry, options));
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
+    return api.Get.dataSet(session, qualify(entry.ref as DsRef), this.readOptions(loc, entry, options));
   }
 
   async readTo(
     loc: PaneLocation, entry: Entry, options: TransferOptions, sink: Writable, signal: AbortSignal,
   ): Promise<void> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     const dsname = qualify(entry.ref as DsRef);
     await pacedDownload(sink, signal, (stream) =>
-      Download.dataSet(session, dsname, { ...this.readOptions(loc, entry, options), stream }));
+      api.Download.dataSet(session, dsname, { ...this.readOptions(loc, entry, options), stream }));
   }
 
   private readOptions(
@@ -311,17 +311,18 @@ export class DsProvider implements PaneProvider {
   async write(
     loc: PaneLocation, name: string, data: Buffer, options: TransferOptions,
   ): Promise<void> {
-    const session = await this.sessions.session(loc.profile);
+    const host = await this.sessions.host(this.kind, loc.profile);
+    const { session, api } = host;
     const target = targetOf(loc, name);
 
     if (resolveMode(options, name, this.settings.binaryExtensions()) === 'binary') {
-      await Upload.bufferToDataSet(session, data, target, { binary: true });
+      await api.Upload.bufferToDataSet(session, data, target, { binary: true });
       return;
     }
 
-    const lrecl = await this.recordLengthFor(session, loc, name);
+    const lrecl = await this.recordLengthFor(host, loc, name);
     const records = fitToRecordLength(data.toString('utf8'), lrecl, options.longLines);
-    await Upload.bufferToDataSet(
+    await api.Upload.bufferToDataSet(
       session,
       // Each record ends in a newline rather than being joined by one: an empty
       // file is no records, not one blank record.
@@ -340,17 +341,18 @@ export class DsProvider implements PaneProvider {
   async writeFrom(
     loc: PaneLocation, name: string, source: Readable, options: TransferOptions, signal: AbortSignal,
   ): Promise<void> {
-    const session = await this.sessions.session(loc.profile);
+    const host = await this.sessions.host(this.kind, loc.profile);
+    const { session, api } = host;
     const target = targetOf(loc, name);
     const upload = (body: Readable, settings: { binary?: boolean; encoding?: string }) =>
-      pacedUpload(body, signal, (stream) => Upload.streamToDataSet(session, stream, target, settings));
+      pacedUpload(body, signal, (stream) => api.Upload.streamToDataSet(session, stream, target, settings));
 
     if (resolveMode(options, name, this.settings.binaryExtensions()) === 'binary') {
       await upload(source, { binary: true });
       return;
     }
 
-    const lrecl = await this.recordLengthFor(session, loc, name);
+    const lrecl = await this.recordLengthFor(host, loc, name);
     const records = pipeline(source, new RecordFitter(lrecl, options.longLines), () => undefined);
     const text = { encoding: options.codepage };
     await (options.longLines === 'abort'
@@ -359,8 +361,8 @@ export class DsProvider implements PaneProvider {
   }
 
   /** What text has to be fitted to: the target's LRECL, or 80 for one that is not there yet. */
-  private async recordLengthFor(session: AbstractSession, loc: PaneLocation, name: string): Promise<number> {
-    const attributes = await this.attributes(session, isFilter(loc.path) ? name : loc.path);
+  private async recordLengthFor(host: ZosHost, loc: PaneLocation, name: string): Promise<number> {
+    const attributes = await this.attributes(host, isFilter(loc.path) ? name : loc.path);
     return Number(attributes?.lrecl ?? 80) || 80;
   }
 
@@ -380,11 +382,12 @@ export class DsProvider implements PaneProvider {
         'Copy it at the data set level instead, where it becomes a PDS of its own.',
       );
     }
-    const session = await this.sessions.session(loc.profile);
+    const host = await this.sessions.host(this.kind, loc.profile);
+    const { session, api } = host;
     const dsname = datasetName(shape.from === 'ds' ? `'${name}'` : name, userPrefix(session));
     const location = { ...loc, path: dsname };
 
-    const existing = await this.attributes(session, dsname);
+    const existing = await this.attributes(host, dsname);
     if (existing) {
       if (!isPartitioned(existing.dsorg)) {
         throw new UserFacingError(`${dsname} exists, and it is not a PDS.`);
@@ -413,13 +416,13 @@ export class DsProvider implements PaneProvider {
       spec.dirblk = Math.max(spec.dirblk ?? 0, 20, Math.ceil(shape.files / 5));
     }
     try {
-      await this.allocate(session, dsname, spec);
+      await this.allocate(host, dsname, spec);
     } catch (err) {
       // The unit came from the original, not from the user: on a system that
       // only takes tracks, the same space in tracks is what they would want.
       if (!(refusedByAcs(err) && spec.alcunit === 'CYL')) throw err;
       log.warn(`${dsname}: SMS refused an allocation in cylinders; trying the same space in tracks.`);
-      await this.allocate(session, dsname, inTracks(spec));
+      await this.allocate(host, dsname, inTracks(spec));
     }
     return { location, created: true };
   }
@@ -428,10 +431,10 @@ export class DsProvider implements PaneProvider {
    * Allocates `dsname`, and turns SMS refusing it into something to act on:
    * its own message asks about storage classes, which nobody may have given.
    */
-  private async allocate(session: AbstractSession, dsname: string, spec: DatasetSpec | undefined): Promise<void> {
+  private async allocate({ session, api }: ZosHost, dsname: string, spec: DatasetSpec | undefined): Promise<void> {
     try {
       await this.sessions.fileService(session, () =>
-        Create.dataSet(session, typeOf(spec), dsname, attributesOf(spec)));
+        api.Create.dataSet(session, typeOf(spec), dsname, attributesOf(spec)));
     } catch (err) {
       if (!refusedByAcs(err)) throw err;
       const { message } = describeError(err);
@@ -453,33 +456,33 @@ export class DsProvider implements PaneProvider {
   }
 
   async exists(loc: PaneLocation, name: string): Promise<boolean> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     if (isFilter(loc.path)) {
-      const response = await this.sessions.fileService(session, () => List.dataSet(session, name, {}));
+      const response = await this.sessions.fileService(session, () => api.List.dataSet(session, name, {}));
       return ((response.apiResponse?.items ?? []) as ZosmfDataSet[]).length > 0;
     }
     const response = await this.sessions.fileService(session, () =>
-      List.allMembers(session, loc.path, { pattern: memberName(name) }));
+      api.List.allMembers(session, loc.path, { pattern: memberName(name) }));
     return ((response.apiResponse?.items ?? []) as ZosmfMember[]).length > 0;
   }
 
   async remove(loc: PaneLocation, entries: Entry[]): Promise<void> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     for (const entry of entries) {
-      await this.sessions.fileService(session, () => Delete.dataSet(session, qualify(entry.ref as DsRef)));
+      await this.sessions.fileService(session, () => api.Delete.dataSet(session, qualify(entry.ref as DsRef)));
     }
   }
 
   /** Shift+F6. A new dataset name is read the same way as an allocated one. */
   async rename(loc: PaneLocation, entry: Entry, newName: string): Promise<void> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     const ref = entry.ref as DsRef;
     if (ref.kind === 'member') {
       await this.sessions.fileService(session, () =>
-        Rename.dataSetMember(session, ref.dsname, ref.member, memberName(newName)));
+        api.Rename.dataSetMember(session, ref.dsname, ref.member, memberName(newName)));
     } else {
       await this.sessions.fileService(session, () =>
-        Rename.dataSet(session, ref.dsname, datasetName(newName, userPrefix(session))));
+        api.Rename.dataSet(session, ref.dsname, datasetName(newName, userPrefix(session))));
     }
   }
 
@@ -489,10 +492,11 @@ export class DsProvider implements PaneProvider {
    * command line), a PDS/E with the shape JCL and source normally use.
    */
   async create(loc: PaneLocation, name: string, spec?: DatasetSpec): Promise<string> {
-    const session = await this.sessions.session(loc.profile);
+    const host = await this.sessions.host(this.kind, loc.profile);
+    const { session, api } = host;
     if (!isFilter(loc.path)) {
       const member = memberName(name);
-      await Upload.bufferToDataSet(session, Buffer.alloc(0), `${loc.path}(${member})`);
+      await api.Upload.bufferToDataSet(session, Buffer.alloc(0), `${loc.path}(${member})`);
       return member;
     }
 
@@ -503,10 +507,10 @@ export class DsProvider implements PaneProvider {
       // would only overwrite what the user asked to inherit.
       const model = datasetName(spec.like, prefix);
       await this.sessions.fileService(session, () =>
-        Create.dataSetLike(session, dsname, model, classesOf(spec)));
+        api.Create.dataSetLike(session, dsname, model, classesOf(spec)));
       return dsname;
     }
-    await this.allocate(session, dsname, spec);
+    await this.allocate(host, dsname, spec);
     return dsname;
   }
 
@@ -522,13 +526,14 @@ export class DsProvider implements PaneProvider {
     const ref = entry.ref as DsRef;
     if (ref.kind !== 'dataset') return;
     const { pollMs, patienceMs } = this.settings.recall ?? RECALL_DEFAULTS;
-    const session = await this.sessions.session(loc.profile);
-    await this.sessions.fileService(session, () => HRecall.dataSet(session, ref.dsname, { wait: false }), signal);
+    const host = await this.sessions.host(this.kind, loc.profile);
+    const { session, api } = host;
+    await this.sessions.fileService(session, () => api.HRecall.dataSet(session, ref.dsname, { wait: false }), signal);
 
     const deadline = Date.now() + patienceMs;
     for (;;) {
       await sleep(pollMs, undefined, { signal });
-      const now = await this.attributes(session, ref.dsname).catch(() => undefined);
+      const now = await this.attributes(host, ref.dsname).catch(() => undefined);
       // Gone altogether is not "back", but it is not worth waiting on either.
       if (now && !isMigrated(now)) return;
       if (Date.now() >= deadline) {
@@ -542,20 +547,18 @@ export class DsProvider implements PaneProvider {
   }
 
   async submit(loc: PaneLocation, entries: Entry[]): Promise<string[]> {
-    // Imported lazily: the jobs SDK is only needed when someone actually submits.
-    const { SubmitJobs } = await import('@zowe/zos-jobs-for-zowe-sdk');
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     const ids: string[] = [];
     for (const entry of entries) {
-      const job = await SubmitJobs.submitJob(session, qualify(entry.ref as DsRef));
+      const job = await api.SubmitJobs.submitJob(session, qualify(entry.ref as DsRef));
       ids.push(job.jobid);
     }
     return ids;
   }
 
-  private async attributes(session: AbstractSession, dsname: string): Promise<ZosmfDataSet | undefined> {
+  private async attributes({ session, api }: ZosHost, dsname: string): Promise<ZosmfDataSet | undefined> {
     const response = await this.sessions.fileService(session, () =>
-      List.dataSet(session, dsname, { attributes: true }));
+      api.List.dataSet(session, dsname, { attributes: true }));
     return ((response.apiResponse?.items ?? []) as ZosmfDataSet[])[0];
   }
 }

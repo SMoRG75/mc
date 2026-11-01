@@ -1,9 +1,8 @@
 import type { Readable, Writable } from 'node:stream';
-import { Create, Delete, Download, Get, List, Upload, Utilities } from '@zowe/zos-files-for-zowe-sdk';
-import type { AbstractSession } from '@zowe/imperative';
 import type { Capabilities, ColumnDef, PaneLocation, TransferOptions } from '../shared/protocol';
 import type { Entry, Listing, ListOptions, PaneProvider, SourceItem } from '../core/provider';
 import type { SessionManager } from '../zowe/sessions';
+import type { ZosHost } from '../zowe/zosApi';
 import { pacedDownload, pacedUpload } from '../zowe/flow';
 import { UserFacingError } from '../core/errors';
 import { resolveMode } from '../core/text';
@@ -35,7 +34,7 @@ export class UssProvider implements PaneProvider {
   }
 
   async list(loc: PaneLocation, signal: AbortSignal, options?: ListOptions): Promise<Listing> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     const dir = loc.path || '/';
     const limit = options?.all ? Infinity : this.settings.pageSize();
     // Asked for no more than the pane will show. z/OSMF puts a listing
@@ -45,7 +44,7 @@ export class UssProvider implements PaneProvider {
     // asked for in full. Two more for '.' and '..', one more to see whether
     // there was more than the pane shows.
     const response = await this.sessions.fileService(session, () =>
-      List.fileList(session, dir, capped(limit, 3)), signal);
+      api.List.fileList(session, dir, capped(limit, 3)), signal);
     signal.throwIfAborted();
 
     // z/OSMF returns '.' and '..'; the pane draws its own '..' row.
@@ -114,18 +113,19 @@ export class UssProvider implements PaneProvider {
   }
 
   async read(loc: PaneLocation, entry: Entry, transfer: TransferOptions): Promise<Buffer> {
-    const session = await this.sessions.session(loc.profile);
+    const host = await this.sessions.host(this.kind, loc.profile);
     const ref = entry.ref as UssRef;
-    return Get.USSFile(session, ref.path, await this.readOptions(session, ref.path, transfer));
+    return host.api.Get.USSFile(host.session, ref.path, await this.readOptions(host, ref.path, transfer));
   }
 
   async readTo(
     loc: PaneLocation, entry: Entry, transfer: TransferOptions, sink: Writable, signal: AbortSignal,
   ): Promise<void> {
-    const session = await this.sessions.session(loc.profile);
+    const host = await this.sessions.host(this.kind, loc.profile);
+    const { session, api } = host;
     const ref = entry.ref as UssRef;
-    const options = await this.readOptions(session, ref.path, transfer);
-    await pacedDownload(sink, signal, (stream) => Download.ussFile(session, ref.path, { ...options, stream }));
+    const options = await this.readOptions(host, ref.path, transfer);
+    await pacedDownload(sink, signal, (stream) => api.Download.ussFile(session, ref.path, { ...options, stream }));
   }
 
   /**
@@ -137,29 +137,29 @@ export class UssProvider implements PaneProvider {
    * the service default.
    */
   private async readOptions(
-    session: AbstractSession, path: string, transfer: TransferOptions,
+    { session, api }: ZosHost, path: string, transfer: TransferOptions,
   ): Promise<{ binary?: boolean; encoding?: string }> {
     if (resolveMode(transfer, basename(path), this.settings.binaryExtensions()) === 'binary') {
       return { binary: true };
     }
     const options: { binary?: boolean; encoding?: string } = { encoding: transfer.codepage };
     await this.sessions.fileService(session, () =>
-      Utilities.applyTaggedEncoding(session, path, options)).catch(() => undefined);
+      api.Utilities.applyTaggedEncoding(session, path, options)).catch(() => undefined);
     if (options.binary) delete options.encoding;
     return options;
   }
 
   async write(loc: PaneLocation, name: string, data: Buffer, options: TransferOptions): Promise<void> {
-    const session = await this.sessions.session(loc.profile);
-    await Upload.bufferToUssFile(session, join(loc.path, name), data, this.writeOptions(name, options));
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
+    await api.Upload.bufferToUssFile(session, join(loc.path, name), data, this.writeOptions(name, options));
   }
 
   async writeFrom(
     loc: PaneLocation, name: string, source: Readable, options: TransferOptions, signal: AbortSignal,
   ): Promise<void> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     await pacedUpload(source, signal, (body) =>
-      Upload.streamToUssFile(session, join(loc.path, name), body, this.writeOptions(name, options)));
+      api.Upload.streamToUssFile(session, join(loc.path, name), body, this.writeOptions(name, options)));
   }
 
   private writeOptions(name: string, options: TransferOptions): { binary?: boolean; encoding?: string } {
@@ -169,54 +169,53 @@ export class UssProvider implements PaneProvider {
   }
 
   async exists(loc: PaneLocation, name: string): Promise<boolean> {
-    const session = await this.sessions.session(loc.profile);
-    const response = await this.sessions.fileService(session, () => List.fileList(session, loc.path, {}));
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
+    const response = await this.sessions.fileService(session, () => api.List.fileList(session, loc.path, {}));
     const items = (response.apiResponse?.items ?? []) as ZosmfUssItem[];
     return items.some((item) => item.name === name);
   }
 
   async remove(loc: PaneLocation, entries: Entry[]): Promise<void> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     for (const entry of entries) {
       const ref = entry.ref as UssRef;
-      await this.sessions.fileService(session, () => Delete.ussFile(session, ref.path, ref.isDirectory));
+      await this.sessions.fileService(session, () => api.Delete.ussFile(session, ref.path, ref.isDirectory));
     }
   }
 
   async rename(loc: PaneLocation, entry: Entry, newName: string): Promise<void> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     const ref = entry.ref as UssRef;
     await this.sessions.fileService(session, () =>
-      Utilities.renameUSSFile(session, ref.path, join(dirname(ref.path), newName)));
+      api.Utilities.renameUSSFile(session, ref.path, join(dirname(ref.path), newName)));
   }
 
   async folder(loc: PaneLocation, name: string): Promise<{ location: PaneLocation; created: boolean }> {
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     const location = { ...loc, path: join(loc.path || '/', name) };
     const response = await this.sessions.fileService(session, () =>
-      List.fileList(session, loc.path || '/', {}));
+      api.List.fileList(session, loc.path || '/', {}));
     const there = ((response.apiResponse?.items ?? []) as ZosmfUssItem[]).find((item) => item.name === name);
     if (there && !there.mode?.startsWith('d')) {
       throw new UserFacingError(`'${location.path}' exists, and it is a file, not a directory.`);
     }
     if (!there) await this.sessions.fileService(session, () =>
-      Create.uss(session, location.path, 'directory'));
+      api.Create.uss(session, location.path, 'directory'));
     return { location, created: !there };
   }
 
   /** F7 makes a directory; a trailing name without '/' still means a directory here. */
   async create(loc: PaneLocation, name: string): Promise<string> {
-    const session = await this.sessions.session(loc.profile);
-    await this.sessions.fileService(session, () => Create.uss(session, join(loc.path, name), 'directory'));
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
+    await this.sessions.fileService(session, () => api.Create.uss(session, join(loc.path, name), 'directory'));
     return name;
   }
 
   async submit(loc: PaneLocation, entries: Entry[]): Promise<string[]> {
-    const { SubmitJobs } = await import('@zowe/zos-jobs-for-zowe-sdk');
-    const session = await this.sessions.session(loc.profile);
+    const { session, api } = await this.sessions.host(this.kind, loc.profile);
     const ids: string[] = [];
     for (const entry of entries) {
-      const job = await SubmitJobs.submitUSSJob(session, (entry.ref as UssRef).path);
+      const job = await api.SubmitJobs.submitUSSJob(session, (entry.ref as UssRef).path);
       ids.push(job.jobid);
     }
     return ids;
