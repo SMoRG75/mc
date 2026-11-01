@@ -59,6 +59,8 @@ const BINDINGS: Record<string, Action> = {
   'Ctrl+f': 'editFilter',
   // Total Commander's directory hotlist, on the same key.
   'Ctrl+d': 'favourites',
+  // A browser's address bar; Esc gives the keyboard back to the pane.
+  'Ctrl+l': 'focusCommandLine',
   // And its Find Files.
   'Alt+F7': 'search',
   Escape: 'cancel',
@@ -139,6 +141,7 @@ export const SHORTCUTS: readonly {
   {
     title: 'The command line',
     rows: [
+      ['Ctrl+L', 'Go to the command line'],
       ['cd <path>', 'Go there in the active pane'],
       ['submit <name>', 'Submit that row'],
       ['recall <name>', 'Recall a migrated data set — Enter on one asks'],

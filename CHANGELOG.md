@@ -8,6 +8,8 @@
   LED segments. *Mainframe Commander: Switch Theme* flips between it and the
   standard look, which still takes its colours from the VS Code theme. Either
   takes effect at once in an open panel.
+- **Ctrl+L goes to the command line**, as to a browser's address bar. Esc
+  gives the keyboard back to the pane, as before.
 
 ## 1.1.0 — 2026-10-24
 

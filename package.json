@@ -190,6 +190,14 @@
       {
         "command": "mc.key",
         "args": {
+          "key": "Ctrl+l"
+        },
+        "key": "ctrl+l",
+        "when": "activeWebviewPanelId == mainframeCommander"
+      },
+      {
+        "command": "mc.key",
+        "args": {
           "key": "Ctrl+f"
         },
         "key": "ctrl+f",
