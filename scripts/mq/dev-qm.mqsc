@@ -1,0 +1,25 @@
+* The queue manager mc's MQ panes are tried against. setup-wsl.sh feeds this
+* to runmqsc after every run, so everything here can be run again: REPLACE
+* keeps the messages already on a queue.
+
+DEFINE QLOCAL('DEV.QUEUE.1') REPLACE
+DEFINE QLOCAL('DEV.QUEUE.2') REPLACE
+DEFINE QLOCAL('DEV.QUEUE.3') REPLACE
+DEFINE QLOCAL('DEV.DEAD.LETTER.QUEUE') REPLACE
+ALTER QMGR DEADQ('DEV.DEAD.LETTER.QUEUE')
+
+* The client channel mc connects through.
+DEFINE CHANNEL('DEV.APP.SVRCONN') CHLTYPE(SVRCONN) TRPTYPE(TCP) MCAUSER(' ') REPLACE
+
+* A new queue manager blocks every administrator (*MQADMIN) on every client
+* channel. mcapp is in group mqm, because PCF inquiries and browsing any queue
+* need it, so on this one channel only the user 'nobody' is blocked. Fine for
+* a test queue manager; not for anything else.
+SET CHLAUTH('DEV.APP.SVRCONN') TYPE(BLOCKUSER) USERLIST('nobody') ACTION(REPLACE)
+
+* Every client connection has to give a Linux user and its password.
+ALTER AUTHINFO('SYSTEM.DEFAULT.AUTHINFO.IDPWOS') AUTHTYPE(IDPWOS) CHCKCLNT(REQUIRED) ADOPTCTX(YES)
+REFRESH SECURITY TYPE(CONNAUTH)
+
+* Started with the queue manager from now on; setup-wsl.sh starts it this once.
+DEFINE LISTENER('DEV.LISTENER.TCP') TRPTYPE(TCP) PORT(1414) CONTROL(QMGR) REPLACE

@@ -1,0 +1,3 @@
+# Run inside WSL/Linux, where a carriage return breaks them.
+*.sh   text eol=lf
+*.mqsc text eol=lf

@@ -70,6 +70,61 @@ handing over to `vsce`, because the credential manager is the one package that
 cannot be bundled: a package built without it in `node_modules` installs
 perfectly and then reads every secure value in `zowe.config.json` as empty.
 
+### MQ
+
+An MQ world is being built. It talks MQI through the
+[`ibmmq`](https://www.npmjs.com/package/ibmmq) package, which needs the IBM MQ C
+client on the machine VS Code runs on. mc does not ship the client: it is
+IBM's code under IBM's licence, and 45 MB zipped even trimmed. IBM gives it away as the
+*Redistributable Client*, and `ibmmq` looks for it in
+`C:\Program Files\IBM\MQ\bin64` on Windows and `/opt/mqm/lib64` on Linux.
+
+On Windows, in a PowerShell run as administrator:
+
+```powershell
+$v = '10.0.1.0'
+curl.exe -fLo "$env:TEMP\mqc.zip" "https://public.dhe.ibm.com/ibmdl/export/pub/software/websphere/messaging/mqdev/redist/$v-IBM-MQC-Redist-Win64.zip"
+New-Item -ItemType Directory -Force 'C:\Program Files\IBM\MQ' | Out-Null
+tar -xf "$env:TEMP\mqc.zip" -C 'C:\Program Files\IBM\MQ'
+```
+
+On Linux x64:
+
+```bash
+v=10.0.1.0
+sudo mkdir -p /opt/mqm
+curl -fL "https://public.dhe.ibm.com/ibmdl/export/pub/software/websphere/messaging/mqdev/redist/$v-IBM-MQC-Redist-LinuxX64.tar.gz" | sudo tar -xz -C /opt/mqm
+```
+
+There is no Redistributable Client for macOS; IBM's MQ toolkit for macOS is
+the way there.
+
+To have a queue manager to try against, IBM MQ Advanced for Developers is free
+for development and installs in WSL's Ubuntu (or any Ubuntu x64).
+[`scripts/mq/setup-wsl.sh`](scripts/mq/setup-wsl.sh) downloads it, installs the
+server, creates queue manager `QM1` with the queues and channel in
+[`scripts/mq/dev-qm.mqsc`](scripts/mq/dev-qm.mqsc), and puts three messages on
+`DEV.QUEUE.1`. `--accept-license` accepts IBM's licence for it, which the
+download carries in `MQServer/licenses`. From the repository:
+
+```bash
+wsl -d Ubuntu-24.04 -u root -- bash scripts/mq/setup-wsl.sh --accept-license
+```
+
+It ends with what to connect with: `localhost`, port `1414`, queue manager
+`QM1`, channel `DEV.APP.SVRCONN`, user `mcapp`, password `passw0rd`
+(`MQ_APP_PASSWORD` sets another). `mcapp` is an MQ administrator, so the
+pane can inquire about and browse every queue. That is fine on a test queue
+manager and on nothing else.
+
+WSL shuts Ubuntu down a while after the last window into it closes, and `QM1`
+goes with it. To start `QM1` again later, and keep it up for as long as the
+window stays open:
+
+```bash
+wsl -d Ubuntu-24.04 -u mqm -- bash -c "/opt/mqm/bin/strmqm QM1; exec sleep infinity"
+```
+
 ## How it fits together
 
 ```
