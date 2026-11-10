@@ -18,8 +18,7 @@ import {
   type RememberedPane, type RememberedPanes,
 } from './core/settings';
 import type { SessionManager } from './zowe/sessions';
-import { issueConsole } from './zowe/console';
-import { issueTso } from './zowe/tso';
+import type { ZosHost } from './zowe/zosApi';
 
 const VIEW_TYPE = 'mainframeCommander';
 
@@ -934,7 +933,8 @@ export class CommanderPanel {
 
   /**
    * `console <command>`, or `/<command>` as in SDSF: one operator command
-   * through z/OSMF's console service, on the host the pane is on. Written to
+   * through z/OSMF's console service, on the host the pane is on. RSE API has
+   * no console, so a pane on an rse profile is told to use a zosmf one. Written to
    * an Output channel of its own as the messages come in, the way `tso` is.
    *
    * Nothing asks first, whatever the command — the console's own authority
@@ -950,13 +950,12 @@ export class CommanderPanel {
         `cd ${typed} goes there; a console command is / and the command, as in /D T.`,
       );
     }
-    const profile = this.hostProfile(pane);
-    const session = await this.sessions.session(profile);
+    const { profile, host } = await this.commandHost(pane);
     const output = this.consoleOutput();
-    output.appendLine(`${profile || session.ISession.hostname}> ${command}`);
+    output.appendLine(`${profile || host.session.ISession.hostname}> ${command}`);
     output.show(true);
     try {
-      await this.sessions.console(session, () => issueConsole(session, command, (lines) => {
+      await this.sessions.console(host.session, () => host.console(command, (lines) => {
         for (const line of lines) output.appendLine(line);
       }));
     } catch (err) {
@@ -968,21 +967,20 @@ export class CommanderPanel {
   }
 
   /**
-   * `tso <command>`: one command through z/OSMF's TSO service, on the host the
-   * pane is on. The answer goes to an Output channel of its own, brought
+   * `tso <command>`: one command through z/OSMF's TSO service or RSE API's,
+   * on the host and profile the pane is on. The answer goes to an Output channel of its own, brought
    * forward without taking the keyboard from the command line, so the next
    * command can be typed straight away.
    */
   private async runTso(pane: PaneId, command: string): Promise<void> {
     if (!command) throw new UserFacingError('tso needs a command, as in: tso LISTCAT LEVEL(IBMUSER)');
-    const profile = this.hostProfile(pane);
-    const session = await this.sessions.session(profile);
+    const { profile, host } = await this.commandHost(pane);
     const output = this.tsoOutput();
     // Which host it went to is part of the answer: TEST and PROD look alike.
-    output.appendLine(`${profile || session.ISession.hostname}> ${command}`);
+    output.appendLine(`${profile || host.session.ISession.hostname}> ${command}`);
     output.show(true);
     try {
-      const reply = await this.sessions.tso(session, () => issueTso(session, command));
+      const reply = await this.sessions.tso(host.session, () => host.tso(command));
       for (const line of reply.lines) output.appendLine(line);
       if (reply.waiting) {
         throw new UserFacingError(
@@ -1002,12 +1000,14 @@ export class CommanderPanel {
   /**
    * The profile a host command goes to: the active pane's, or the other
    * pane's when the active one is on the local disk. With both on the local
-   * disk, the default profile.
+   * disk, the default profile. Through that pane's way in — z/OSMF or RSE
+   * API, whichever its profile is.
    */
-  private hostProfile(pane: PaneId): string {
+  private async commandHost(pane: PaneId): Promise<{ profile: string; host: ZosHost }> {
     const other: PaneId = pane === 'left' ? 'right' : 'left';
     const remote = [pane, other].map((p) => this.panes[p].location).find((l) => l.kind !== 'local');
-    return remote?.profile ?? '';
+    const profile = remote?.profile ?? '';
+    return { profile, host: await this.sessions.host(remote?.kind ?? 'ds', profile) };
   }
 
   private consoleOutput(): vscode.OutputChannel {

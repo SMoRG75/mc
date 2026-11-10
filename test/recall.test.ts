@@ -12,7 +12,7 @@ import { planCopy } from '../src/core/treeCopy';
 import { DsProvider } from '../src/providers/dsProvider';
 import { LocalProvider } from '../src/providers/localProvider';
 import type { SessionManager } from '../src/zowe/sessions';
-import { ZOSMF_API } from '../src/zowe/zosApi';
+import { zosmfHost } from '../src/zowe/zosApi';
 
 /**
  * A z/OSMF with one data set on it, migrated until `backAfter` checks after
@@ -48,7 +48,7 @@ async function zosmf(backAfter: number) {
     protocol: 'http', type: 'basic', user: 'u', password: 'p', rejectUnauthorized: false,
   });
   const sessions = {
-    host: async () => ({ type: 'zosmf', session, api: ZOSMF_API }),
+    host: async () => zosmfHost(session),
     fileService: <T>(_session: unknown, call: () => Promise<T>) => call(),
   };
   const ds = (patienceMs = 5_000) => new DsProvider(sessions as unknown as SessionManager, {

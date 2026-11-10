@@ -1,6 +1,8 @@
 import { Create, Delete, Download, Get, HRecall, List, Rename, Upload, Utilities } from '@zowe/zos-files-for-zowe-sdk';
 import { DeleteJobs, DownloadJobs, GetJobs, SubmitJobs } from '@zowe/zos-jobs-for-zowe-sdk';
 import type { AbstractSession } from '@zowe/imperative';
+import { issueConsole } from './console';
+import { issueTso, type TsoReply } from './tso';
 
 /**
  * Every call the providers make to z/OS, in the shape the z/OSMF SDKs give
@@ -41,4 +43,19 @@ export interface ZosHost {
   type: string;
   session: AbstractSession;
   api: ZosApi;
+  /** One TSO command from the command line. */
+  tso(command: string): Promise<TsoReply>;
+  /** One console command, its messages handed to `write` as they come. */
+  console(command: string, write: (lines: string[]) => void): Promise<void>;
+}
+
+/** A zosmf profile's way in: the SDKs, and z/OSMF's own TSO and console services. */
+export function zosmfHost(session: AbstractSession): ZosHost {
+  return {
+    type: 'zosmf',
+    session,
+    api: ZOSMF_API,
+    tso: (command) => issueTso(session, command),
+    console: (command, write) => issueConsole(session, command, write),
+  };
 }

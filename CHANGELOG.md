@@ -19,7 +19,8 @@
   Zowe CLI installed it and does not ship. Where RSE API differs: a text file
   written to USS is tagged with its code page, an allocation takes no volume
   or SMS classes (LIKE still brings the model's), and members have no ISPF
-  statistics. TSO and console commands still need a zosmf profile.
+  statistics. `tso` goes through RSE API too; console commands need a
+  zosmf profile, as RSE API has no console, and say so.
 - A pane whose listing fails in another world or on another profile now
   shows that world's header, so the profile selector can take it off a
   profile that does not work.

@@ -4,7 +4,7 @@ import { UserFacingError } from '../core/errors';
 import { log } from '../core/log';
 import { Serializer } from '../core/serial';
 import { rseHost } from './rse';
-import { ZOSMF_API, type ZosHost } from './zosApi';
+import { type ZosHost, zosmfHost } from './zosApi';
 
 const ZOSMF = 'zosmf';
 
@@ -145,7 +145,7 @@ export class SessionManager {
     // z/OSMF's own path, cache and all — which is also what tells the user
     // about a profile that is not there.
     if (!attrs || attrs.profType === ZOSMF) {
-      return { type: ZOSMF, session: await this.session(attrs?.profName ?? profileName), api: ZOSMF_API };
+      return zosmfHost(await this.session(attrs?.profName ?? profileName));
     }
 
     const merged = info.mergeArgsForProfile(attrs, { getSecureVals: true });

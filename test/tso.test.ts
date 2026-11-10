@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { parseRseTsoReply } from '../src/zowe/rse';
 import { parseTsoReply } from '../src/zowe/tso';
 
 test('a TSO answer comes back as lines, without the READY that ends it', () => {
@@ -41,4 +42,22 @@ test('a command that stopped to ask for something says so', () => {
   const partial = parseTsoReply({ cmdResponse: [{ message: 'ENTER PASSWORD' }], tsoPromptReceived: 'N' });
   assert.deepEqual(partial.lines, ['ENTER PASSWORD']);
   assert.equal(partial.waiting, true);
+});
+
+test('an RSE API answer comes back as lines, however the server packs them', () => {
+  // The swagger's own example: one entry holding several lines.
+  assert.deepEqual(
+    parseRseTsoReply({ output: ['CATALOG:CATALOG.V3S932\nUSER2.AAA.SEQ.BLK3120\nUSER2.ABC'] }).lines,
+    ['CATALOG:CATALOG.V3S932', 'USER2.AAA.SEQ.BLK3120', 'USER2.ABC'],
+  );
+  // One string, as some servers send it, READY and all.
+  assert.deepEqual(
+    parseRseTsoReply({ output: 'IKJ56650I TIME-01:17:01 PM.\r\nREADY \n' }),
+    { lines: ['IKJ56650I TIME-01:17:01 PM.'], waiting: false },
+  );
+});
+
+test('an RSE API answer with no output is no lines, not a failure', () => {
+  assert.deepEqual(parseRseTsoReply(undefined), { lines: [], waiting: false });
+  assert.deepEqual(parseRseTsoReply({}), { lines: [], waiting: false });
 });

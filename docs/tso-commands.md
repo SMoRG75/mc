@@ -84,6 +84,23 @@ command may well still be there for the next — but nothing promises it, so mc
 does not offer `tso` as a way to build up a session, and the F1 text says one
 command at a time.
 
+### Over an rse profile
+
+Added 2026-11-10. A pane on an rse profile sends `tso` to RSE API's
+`PUT /rseapi/api/v1/tso?command=` (in the RSE API 1.1.4 swagger), answered
+`{"output": [...]}`, an entry possibly holding several lines. The command
+goes as typed, as it does to z/OSMF. IBM's RSE API plug-in puts the whole
+command in capitals, which would keep lower case inside it, as in OSHELL,
+from reaching TSO; mc does not copy that — chosen 2026-11-10, and the first
+thing to look at if a real RSE API host turns out to need it. What mc does
+copy is asking a second time when the first answer has no `output`. RSE API has
+no prompt flag, so a command that stops to ask shows what came before and is
+not flagged. RSE API keeps no ISPF profile open beside the file services, so
+the collision measurements below are z/OSMF's only.
+
+Tried against the virtual mainframe (VTS1) only; no real RSE API host was
+reachable.
+
 ## Concurrency: no ISPT036
 
 This was the question to answer before designing anything. The file services

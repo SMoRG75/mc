@@ -91,6 +91,18 @@ Not behind the file services or TSO: the console is a service of its own,
 with no TSO address space of the user's in it — not measured, but nothing
 suggests otherwise.
 
+## Over an rse profile
+
+RSE API has no console service: there is none in its 1.1.4 swagger nor in
+the capabilities IBM's plug-in knows of, and the plug-in's own "MVS command"
+posts the command to `/unixcommands` as if it were a UNIX command. So a
+console command from a pane on an rse profile is refused with a sentence
+saying to switch the pane to a zosmf profile for that host. mc does not
+look for a zosmf profile on the same host by itself: a host name is not
+enough to tell LPARs apart (the virtual mainframe's TEST and PROD are both
+127.0.0.1), and a console command sent to PROD by mistake is the worst
+mistake to make.
+
 ## What mc says when it goes wrong
 
 - **Authority to the command** (`IEE345I … AUTHORITY INVALID`) is the

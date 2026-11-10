@@ -10,6 +10,7 @@ import {
 import type { IDownloadSpoolContentParms, IJob, IJobFile } from '@zowe/zos-jobs-for-zowe-sdk';
 import { describeError, UserFacingError } from '../core/errors';
 import { log } from '../core/log';
+import type { TsoReply } from './tso';
 import type { ZosApi, ZosHost } from './zosApi';
 
 /**
@@ -30,6 +31,7 @@ interface RsePlugin {
   RseRestJesApi: new (profile: LoadedProfile) => RseJes;
   RseRestClient: {
     getExpectJSON<T>(session: AbstractSession, resource: string, headers?: object[]): Promise<T>;
+    putExpectJSON<T>(session: AbstractSession, resource: string, headers?: object[], payload?: unknown): Promise<T>;
   };
   ZosRestApiConstants: { RESOURCE: string; USS_FILES: string; PATH: string };
 }
@@ -160,13 +162,60 @@ export function rseHost(profileName: string, args: IProfArgAttrs[]): ZosHost {
     profile: Object.fromEntries(args.map((arg) => [arg.argName, arg.argValue])),
   };
   const mvs = new RseRestMvsApi(loaded);
+  const session = mvs.getSession();
   return {
     type: 'rse',
     // Who and where, for the serializer and for "my jobs"; the calls below
     // each use the session their own class made from the same profile.
-    session: mvs.getSession(),
+    session,
     api: rseApi(rse, mvs, new RseRestUssApi(loaded), new RseRestJesApi(loaded)),
+    tso: (command) => rseTso(rse, session, command),
+    console: async () => {
+      throw new UserFacingError(
+        'RSE API has no console service, so console commands need a zosmf profile.',
+        'Switch the pane to a zosmf profile for this host in its profile selector, and send the command again.',
+      );
+    },
   };
+}
+
+/**
+ * One TSO command through RSE API's `PUT /tso`.
+ *
+ * Sent as typed, as it is to z/OSMF, so the same command does the same on
+ * either: lower case inside it, as in OSHELL, reaches TSO. IBM's own client
+ * puts the whole command in capitals; that is not copied. What is copied is
+ * asking a second time when the first answer has no output at all.
+ *
+ * Not through the plug-in's own call, which does both, and joins the lines
+ * of a long answer with commas.
+ */
+async function rseTso(rse: RsePlugin, session: AbstractSession, command: string): Promise<TsoReply> {
+  const resource = `${rse.ZosRestApiConstants.RESOURCE}/tso?command=${encodeURIComponent(command)}`;
+  const ask = () => rse.RseRestClient.putExpectJSON<RseTsoResponse | undefined>(session, resource, [], null);
+  let body = await ask();
+  if (body?.output === undefined) body = await ask();
+  return parseRseTsoReply(body);
+}
+
+interface RseTsoResponse {
+  /** The swagger says lines; a line may hold several, and a server may send one string. */
+  output?: string | string[];
+}
+
+/**
+ * What TSO wrote, a line each, without the READY that ends it. RSE API has no
+ * word for a command that stopped to ask for something, so `waiting` is never
+ * set: what came before the prompt is all there is to show.
+ */
+export function parseRseTsoReply(body: RseTsoResponse | undefined): TsoReply {
+  const output = body?.output ?? [];
+  const lines = (Array.isArray(output) ? output : [output])
+    .flatMap((item) => String(item).split(/\r?\n/))
+    .map((line) => line.trimEnd());
+  while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+  if (lines.length > 0 && lines[lines.length - 1]!.trim() === 'READY') lines.pop();
+  return { lines, waiting: false };
 }
 
 /**
