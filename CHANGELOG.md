@@ -1,15 +1,10 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 — 2026-11-10
 
-- **A neon theme**, `mc.theme: "neon"`: a dark panel with glowing accents —
-  the panes as cards with the active one lit, the path bar as an LED readout,
-  folders in cyan, each F-key in a colour of its own and the transfer bar in
-  LED segments. *Mainframe Commander: Switch Theme* flips between it and the
-  standard look, which still takes its colours from the VS Code theme. Either
-  takes effect at once in an open panel.
-- **Ctrl+L goes to the command line**, as to a browser's address bar. Esc
-  gives the keyboard back to the pane, as before.
+A second way in: RSE API profiles beside the z/OSMF ones, for DS, USS, JES
+and TSO. Besides that, a neon theme and Ctrl+L to the command line.
+
 - **RSE API profiles.** An `rse` Zowe profile now sits beside the `zosmf`
   ones in the DS, USS and JES panes' profile selector, and everything those
   panes do goes through IBM's RSE API: listing, F3, saving, copying and
@@ -21,9 +16,24 @@
   or SMS classes (LIKE still brings the model's), and members have no ISPF
   statistics. `tso` goes through RSE API too; console commands need a
   zosmf profile, as RSE API has no console, and say so.
+- **A neon theme**, `mc.theme: "neon"`: a dark panel with glowing accents —
+  the panes as cards with the active one lit, the path bar as an LED readout,
+  folders in cyan, each F-key in a colour of its own and the transfer bar in
+  LED segments. *Mainframe Commander: Switch Theme* flips between it and the
+  standard look, which still takes its colours from the VS Code theme. Either
+  takes effect at once in an open panel.
+- **Ctrl+L goes to the command line**, as to a browser's address bar. Esc
+  gives the keyboard back to the pane, as before.
 - A pane whose listing fails in another world or on another profile now
   shows that world's header, so the profile selector can take it off a
   profile that does not work.
+
+### Known limitations
+
+- RSE API has been tried against a simulated host only, written from IBM's
+  swagger for RSE API 1.1.4; no real RSE API host was within reach. Members
+  are listed whole over RSE, since asking for a page of them needs RSE API
+  1.1.6.
 
 ## 1.1.0 — 2026-10-24
 

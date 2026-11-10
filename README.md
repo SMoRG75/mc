@@ -261,7 +261,7 @@ special case, just `source.readTo()` streaming into `target.writeFrom()`.
 
 ## Status
 
-1.1. All four worlds — local disk, MVS, USS and JES — are written against the
+1.2. All four worlds — local disk, MVS, USS and JES — are written against the
 Zowe v8 API and tested against a real z/OSMF (IBM Z Xplore) with
 `npm run test:host`, alongside the unit tests for the parts that can lose data
 quietly: the EBCDIC tables, LRECL fitting, transfer-mode choice and error
@@ -294,7 +294,8 @@ Known limitations:
   with the log at `mc.log.level` `debug`.
 
 1.1 did what 1.0 put off: TSO and console commands on the command line, and
-moving files and folders with F6. What changed is in the
+moving files and folders with F6. 1.2 adds RSE API profiles beside the z/OSMF
+ones, for everything but the console. What changed is in the
 [CHANGELOG](CHANGELOG.md); the designs of the two commands, and what was
 measured on a host for them, are in [docs/tso-commands.md](docs/tso-commands.md)
 and [docs/console-commands.md](docs/console-commands.md).
