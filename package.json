@@ -509,11 +509,14 @@
     "@types/node": "^26.6.3",
     "@types/vscode": "^1.138.0",
     "@vscode/vsce": "^4.0.0",
-    "@zowe/core-for-zowe-sdk": "^8.38.0",
-    "@zowe/imperative": "^8.38.0",
-    "@zowe/zos-files-for-zowe-sdk": "^8.38.0",
-    "@zowe/zos-jobs-for-zowe-sdk": "^8.38.0",
+    "@zowe/core-for-zowe-sdk": "^8.43.0",
+    "@zowe/imperative": "^8.43.0",
+    "@zowe/zos-files-for-zowe-sdk": "^8.43.0",
+    "@zowe/zos-jobs-for-zowe-sdk": "^8.43.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
   }
 }
