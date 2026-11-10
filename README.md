@@ -5,6 +5,18 @@ The connection goes through [Zowe](https://www.zowe.org/), so the user's existin
 `zowe.config.json` — certificates, MFA and credential manager included — is the
 only setup required.
 
+A pane can be on a `zosmf` profile or an `rse` one. An `rse` profile goes
+through IBM's RSE API instead of z/OSMF, and needs IBM's RSE API plug-in for
+Zowe CLI:
+
+```bash
+zowe plugins install @ibm/rse-api-for-zowe-cli
+```
+
+mc uses the plug-in where Zowe CLI installed it (under `ZOWE_CLI_HOME`, or
+`~/.zowe`) and does not ship it: it is IBM's code under IBM's licence. Without
+it, a `zosmf` profile works as before, and an `rse` one says what to install.
+
 The design sketch it started from is in
 [`docs/mainframe-commander-mockup.html`](docs/mainframe-commander-mockup.html) — kept as it
 was drawn, so it differs from what was built in places.
@@ -39,6 +51,12 @@ MC_HOST_PDS=USER.SCRATCH MC_HOST_USS_DIR=/u/user/scratch npm run test:host
 
 In Git Bash, prefix it with `MSYS_NO_PATHCONV=1`, or the USS path arrives as a
 Windows one.
+
+`MC_HOST_PROFILE` may name an `rse` profile too, and the same tests then run
+through RSE API. Outside VS Code the plug-in fails to load, because it asks for
+the `vscode` module the moment it is required; give it a stand-in, a
+`node_modules/vscode/index.js` anywhere that exports a do-nothing `Proxy`, and
+point `NODE_PATH` at that `node_modules`.
 
 ```bash
 npm run vsix           # -> mainframe-commander-<version>.vsix
@@ -80,7 +98,11 @@ src/
 │  ├─ ussProvider.ts       USS: paths, permissions, tagging
 │  └─ jesProvider.ts       JES: jobs as folders, spool DDs as files
 └─ zowe/
-   ├─ sessions.ts          ProfileInfo → session, cached per profile name
+   ├─ sessions.ts          ProfileInfo → session or host, cached per profile name
+   ├─ zosApi.ts            The z/OS calls the providers make, and a zosmf profile's way in
+   ├─ rse.ts               An rse profile's way in: the same calls, through IBM's RSE API plug-in
+   ├─ tso.ts               TSO commands through z/OSMF's stateless TSO service
+   ├─ console.ts           Console commands through z/OSMF's console service
    └─ flow.ts              Backpressure and cancellation for the SDK's streaming calls
 
 webview/
@@ -133,6 +155,19 @@ special case, just `source.readTo()` streaming into `target.writeFrom()`.
   keeps its folder, and the folders around it, where they were. Job output is
   not moved — JES deletes whole jobs, never a spool file — so F5 it and F8 the
   job. Shift+F6 renames in place, as in Total Commander.
+- **RSE API fits under the providers, not beside them.** The providers call
+  z/OS through `ZosApi` in `zowe/zosApi.ts`: the calls of the z/OSMF SDKs,
+  in the SDKs' own shape, down to z/OSMF's field names. For a `zosmf` profile
+  that is the SDKs themselves, exactly as before. For an `rse` profile,
+  `zowe/rse.ts` answers the same calls through the Zowe Explorer classes of
+  IBM's RSE API plug-in, which already answer in z/OSMF's shapes, so no
+  provider knows which way it came. Where RSE API cannot do what z/OSMF does,
+  the comment in `rse.ts` says so. A text file written to USS is tagged with
+  its code page. An allocation takes no volume or SMS classes, though LIKE
+  still brings the model's. Members have no ISPF statistics. `tso` goes
+  through RSE API's TSO service as typed, but RSE API has no console, so a
+  console command from an `rse` pane asks for a `zosmf` profile instead of
+  guessing one: a host name does not tell TEST from PROD.
 - **JES is a file system.** Jobs are folders, spool DDs are files. That is why
   F3/F5/F8 mean the same thing there as everywhere else, without a separate
   command palette just for jobs.
@@ -249,6 +284,14 @@ Known limitations:
   `/D T` gives you a message that makes no sense, please
   [open an issue](https://github.com/SMoRG75/mc/issues) with what the pane
   said and the log at `mc.log.level` `debug`.
+- **RSE API has been tried against a simulated host only.** The pane
+  actions and `tso` pass `npm run test:host` over an `rse` profile, and the
+  pane actions were also tried by hand in VS Code. All of it ran against a
+  simulated RSE API written from IBM's swagger for RSE API 1.1.4. No real
+  RSE API host was within reach. Members are listed whole over RSE, since
+  asking for a page of them needs RSE API 1.1.6. If an `rse` profile does
+  something a `zosmf` one on the same host does not, please open an issue
+  with the log at `mc.log.level` `debug`.
 
 1.1 did what 1.0 put off: TSO and console commands on the command line, and
 moving files and folders with F6. What changed is in the
