@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A user's guide to Mainframe Commander, a dual-pane file manager for z/OS in VS Code: what you need, how to start, the keys you'll use most, and useful settings.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Mainframe Commander Guide">
+<meta property="og:description" content="A dual-pane file manager for z/OS in VS Code: your PC on one side, data sets, USS files or jobs on the other, and the same F-keys everywhere.">
+<meta property="og:image" content="https://raw.githubusercontent.com/SMoRG75/mc/master/images/icon.png">
+<title>Mainframe Commander Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one reading column; a two-pane commander mock as the opener; keys and settings set as keycaps and copyable config blocks. */
+:root {
+  color-scheme: light;
+  --bg: #f6f7fa;
+  --surface: #ffffff;
+  --fg: #182032;
+  --muted: #586378;
+  --line: #dde1ea;
+  --accent: #1f5fbf;
+  --accent-soft: #e6eefb;
+  --key-bg: #ffffff;
+  --key-edge: #c3cad8;
+  --code-bg: #eef1f6;
+  --mock-bg: #151b27;
+  --mock-pane: #1b2333;
+  --mock-head: #24304a;
+  --mock-fg: #d7deeb;
+  --mock-dim: #7f8ba3;
+  --mock-cursor: #2f6fd6;
+  --mock-mark: #f0c254;
+  --mock-folder: #7cc4e8;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151e; --surface: #171d29; --fg: #e3e8f2; --muted: #9aa5ba; --line: #2a3346;
+    --accent: #6ea2f2; --accent-soft: #1c2a44; --key-bg: #1f2737; --key-edge: #3a465e; --code-bg: #1a2130;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151e; --surface: #171d29; --fg: #e3e8f2; --muted: #9aa5ba; --line: #2a3346;
+  --accent: #6ea2f2; --accent-soft: #1c2a44; --key-bg: #1f2737; --key-edge: #3a465e; --code-bg: #1a2130;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+img { max-width: 100%; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 860px; margin: 0 auto; padding-block: 48px 72px; display: flex; flex-direction: column; gap: 56px; }
+
+header { display: flex; flex-direction: column; gap: 14px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+h1 { font-size: clamp(32px, 5vw, 44px); line-height: 1.1; margin: 0; font-weight: 700; letter-spacing: -.01em; text-wrap: balance; }
+.lede { font-size: 18px; color: var(--muted); margin: 0; max-width: 62ch; }
+h2 { font-size: 24px; line-height: 1.25; margin: 0; font-weight: 700; text-wrap: balance; }
+h3 { font-size: 17px; margin: 0; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+section { display: flex; flex-direction: column; gap: 18px; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+code { font-family: var(--font-mono); font-size: .9em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+kbd {
+  font-family: var(--font-mono); font-size: 13px; font-weight: 500; white-space: nowrap;
+  background: var(--key-bg); color: var(--fg);
+  border: 1px solid var(--key-edge); border-bottom-width: 2px; border-radius: 5px;
+  padding: 1px 7px; display: inline-block; line-height: 1.5;
+}
+ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; max-width: 68ch; }
+
+/* The commander mock */
+.mock { background: var(--mock-bg); border-radius: 10px; padding: 10px; font-family: var(--font-mono); font-size: 13px; color: var(--mock-fg); display: flex; flex-direction: column; gap: 8px; }
+.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pane { background: var(--mock-pane); border-radius: 6px; overflow: hidden; min-width: 0; border: 1px solid transparent; }
+.pane.active { border-color: var(--mock-cursor); }
+.pane-head { background: var(--mock-head); padding: 6px 10px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.world { font-weight: 600; color: #fff; }
+.path { color: var(--mock-dim); overflow-wrap: anywhere; }
+.rows { list-style: none; margin: 0; padding: 4px 0; }
+.rows li { display: flex; justify-content: space-between; gap: 12px; padding: 1px 10px; white-space: nowrap; }
+.rows li span:last-child { color: var(--mock-dim); font-variant-numeric: tabular-nums; }
+.rows .dir span:first-child { color: var(--mock-folder); }
+.rows .marked span:first-child { color: var(--mock-mark); }
+.rows .cursor { background: var(--mock-cursor); }
+.rows .cursor span { color: #fff !important; }
+.fbar { display: flex; flex-wrap: wrap; gap: 4px; }
+.fbar span { flex: 1 1 auto; text-align: center; background: var(--mock-pane); border-radius: 4px; padding: 3px 6px; white-space: nowrap; }
+.fbar b { color: var(--mock-mark); font-weight: 600; margin-right: 4px; }
+.caption { font-size: 14px; color: var(--muted); }
+
+/* Lists of needs and steps */
+.needs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.need { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.need p { font-size: 15px; color: var(--muted); }
+.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 32px 1fr; gap: 12px; align-items: start; }
+.steps li::before { content: counter(s); font-family: var(--font-mono); font-weight: 600; width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 14px; }
+.steps li > div { min-width: 0; padding-top: 2px; }
+
+/* Key table */
+.keys { border-top: 1px solid var(--line); }
+.keys .row { display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.keys .row > div:first-child { display: flex; flex-wrap: wrap; gap: 4px; }
+.keys .group { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 18px 0 6px; border-bottom: 1px solid var(--line); }
+.note { background: var(--accent-soft); border-radius: 8px; padding: 14px 16px; font-size: 15px; max-width: none; }
+
+/* Settings */
+.setting { display: flex; flex-direction: column; gap: 10px; }
+.cfg { position: relative; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.cfg pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; }
+.cfg .c { color: var(--muted); }
+.cfg .k { color: var(--accent); }
+.copy { position: absolute; top: 8px; right: 8px; font: 500 12px var(--font-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 3px 9px; cursor: pointer; }
+.copy:hover { border-color: var(--accent); }
+
+footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 20px; display: flex; flex-direction: column; gap: 6px; }
+
+@media (max-width: 640px) {
+  .wrap { padding-block: 28px 48px; gap: 44px; }
+  .panes { grid-template-columns: 1fr; }
+  .keys .row { grid-template-columns: 1fr; gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">VS Code extension · z/OS</div>
+  <h1>Mainframe Commander</h1>
+  <p class="lede">Two panes side by side, F-keys to move things between them. Your PC on one side, your data sets, USS files or jobs on the other, and the same keys work everywhere.</p>
+</header>
+
+<section aria-label="What it looks like">
+  <div class="mock" role="img" aria-label="Two panes: a local folder of JCL on the left, the member list of MYUSER.JCL on the right, with the F-key bar below">
+    <div class="panes">
+      <div class="pane">
+        <div class="pane-head"><span class="world">LOCAL</span><span class="path">C:\work\jcl</span></div>
+        <ul class="rows">
+          <li class="dir"><span>..</span><span>&lt;up&gt;</span></li>
+          <li class="dir"><span>old</span><span>&lt;dir&gt;</span></li>
+          <li class="marked"><span>BACKUP.jcl</span><span>1.2 KB</span></li>
+          <li class="marked"><span>COMPILE.jcl</span><span>2.8 KB</span></li>
+          <li><span>REPORT.jcl</span><span>0.9 KB</span></li>
+        </ul>
+      </div>
+      <div class="pane active">
+        <div class="pane-head"><span class="world">DS · prod</span><span class="path">MYUSER.JCL</span></div>
+        <ul class="rows">
+          <li class="dir"><span>..</span><span>&lt;up&gt;</span></li>
+          <li class="cursor"><span>BACKUP</span><span>2026-11-03</span></li>
+          <li><span>COMPILE</span><span>2026-10-28</span></li>
+          <li><span>NIGHTLY</span><span>2026-11-10</span></li>
+          <li><span>REPORT</span><span>2026-09-14</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fbar" aria-hidden="true">
+      <span><b>F1</b>Help</span><span><b>F3</b>View</span><span><b>F4</b>Edit</span><span><b>F5</b>Copy</span><span><b>F6</b>Move</span><span><b>F7</b>New</span><span><b>F8</b>Delete</span><span><b>F9</b>Submit</span>
+    </div>
+  </div>
+  <p class="caption">Each pane shows one of four places: <strong>Local</strong> (your PC), <strong>DS</strong> (data sets and PDS members), <strong>USS</strong> (z/OS Unix files) or <strong>JES</strong> (your jobs, with their output as files).</p>
+</section>
+
+<section>
+  <h2>What you need</h2>
+  <div class="needs">
+    <div class="need">
+      <h3>VS Code</h3>
+      <p>Install <strong>Mainframe Commander</strong> from the Extensions view, or from the <a href="https://marketplace.visualstudio.com/items?itemName=ubidk.mainframe-commander">Marketplace</a>.</p>
+    </div>
+    <div class="need">
+      <h3>A Zowe connection</h3>
+      <p>If you already use Zowe Explorer or Zowe CLI, you have one: Mainframe Commander uses the same profiles, passwords and certificates. If not, ask whoever looks after the mainframe how your site connects with Zowe.</p>
+    </div>
+    <div class="need">
+      <h3>For RSE connections only</h3>
+      <p>If your profile is of type <code>rse</code> rather than <code>zosmf</code>, install IBM's RSE plug-in for Zowe once:</p>
+      <div class="cfg"><pre>zowe plugins install @ibm/rse-api-for-zowe-cli</pre><button class="copy" type="button">Copy</button></div>
+    </div>
+  </div>
+  <p>Both connection types do everything, including TSO commands. Console commands are the one exception: they need a z/OSMF connection.</p>
+</section>
+
+<section>
+  <h2>Getting started</h2>
+  <ol class="steps">
+    <li><div>Open Mainframe Commander with <kbd>Ctrl+Shift+Alt+M</kbd> (<kbd>Cmd+Shift+Alt+M</kbd> on a Mac), or run <em>Mainframe Commander: Open</em> from the Command Palette.</div></li>
+    <li><div>At the top of each pane, pick a connection and a place: Local, DS, USS or JES. <kbd>Alt+1</kbd> to <kbd>Alt+4</kbd> switch between them.</div></li>
+    <li><div>Move with the arrow keys, open with <kbd>Enter</kbd>, go up with <kbd>Backspace</kbd>, and jump to the other pane with <kbd>Tab</kbd>.</div></li>
+    <li><div>Press <kbd>F1</kbd> whenever you forget a key. It lists every shortcut.</div></li>
+  </ol>
+</section>
+
+<section>
+  <h2>The keys you'll use most</h2>
+  <div class="keys">
+    <div class="group">Getting around</div>
+    <div class="row"><div><kbd>Enter</kbd> <kbd>Backspace</kbd></div><div>Open a folder, library or job · go up one level</div></div>
+    <div class="row"><div><kbd>Tab</kbd></div><div>The other pane</div></div>
+    <div class="row"><div><kbd>Ctrl+U</kbd></div><div>Swap the two panes</div></div>
+    <div class="row"><div><kbd>Ctrl+D</kbd></div><div>Saved views: save where you are, or jump back to a saved place</div></div>
+    <div class="group">Working with files</div>
+    <div class="row"><div><kbd>Insert</kbd> <kbd>Space</kbd></div><div>Mark a row</div></div>
+    <div class="row"><div><kbd>F3</kbd> <kbd>F4</kbd></div><div>View · edit in VS Code's own editor</div></div>
+    <div class="row"><div><kbd>F5</kbd></div><div>Copy to the other pane</div></div>
+    <div class="row"><div><kbd>Shift+F5</kbd></div><div>Copy with last time's settings, no dialog</div></div>
+    <div class="row"><div><kbd>F6</kbd> <kbd>Shift+F6</kbd></div><div>Move to the other pane · rename</div></div>
+    <div class="row"><div><kbd>F7</kbd></div><div>New member, folder or data set</div></div>
+    <div class="row"><div><kbd>F8</kbd></div><div>Delete</div></div>
+    <div class="row"><div><kbd>F9</kbd></div><div>Submit as JCL</div></div>
+    <div class="row"><div><kbd>F10</kbd></div><div>Compare the two rows the cursors are on</div></div>
+    <div class="group">Finding things</div>
+    <div class="row"><div><kbd>Ctrl+S</kbd></div><div>Quick filter: type to narrow the list</div></div>
+    <div class="row"><div><kbd>Ctrl+F</kbd></div><div>Change what the pane shows, such as <code>MYUSER.*</code> on DS, or owner and job name on JES</div></div>
+    <div class="row"><div><kbd>Alt+F7</kbd></div><div>Search below where you are, by name and by text inside the files</div></div>
+    <div class="row"><div><kbd>Ctrl+L</kbd></div><div>The command line</div></div>
+  </div>
+  <p class="note">When rows are marked, <kbd>F5</kbd>, <kbd>F6</kbd>, <kbd>F8</kbd> and <kbd>F9</kbd> work on all of them. With nothing marked, they work on the row under the cursor.</p>
+</section>
+
+<section>
+  <h2>Good to know</h2>
+  <ul>
+    <li><strong>F5 copies whole folders.</strong> A PDS to a folder on your PC, a folder of JCL into a new PDS, or a job's output to disk. Put the two panes on different connections and F5 copies straight from one LPAR to another.</li>
+    <li><strong>The command line</strong> (<kbd>Ctrl+L</kbd>): <code>tso LISTCAT</code> runs a TSO command, <code>/D T</code> runs a console command as in SDSF, and <code>cd SYS1.PROCLIB</code> jumps straight there. Answers appear in the Output panel. <kbd>Esc</kbd> takes you back to the pane.</li>
+    <li><strong>A DS pane starts on your own data sets</strong> (<code>YOURUSER.*</code>). Avoid a filter that is just <code>*</code>: it asks the mainframe to walk the whole catalog.</li>
+    <li><strong>When something goes wrong</strong>, <em>Mainframe Commander: Show Log</em> shows what happened. It is the thing to attach when you report a problem.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Useful settings</h2>
+  <p>Open VS Code's settings with <kbd>Ctrl+,</kbd> and search for <em>Mainframe Commander</em>, or paste the lines below into <code>settings.json</code> via <em>Preferences: Open User Settings (JSON)</em>. Replace the profile names and filters with your own.</p>
+
+  <div class="setting">
+    <h3>Where the panes start</h3>
+    <div class="cfg"><pre><span class="c">// Left pane: your data sets on test</span>
+<span class="k">"mc.panes.left"</span>:  { "kind": "ds",  "profile": "test", "path": "MYUSER.*" },
+<span class="c">// Right pane: your jobs on the same system</span>
+<span class="k">"mc.panes.right"</span>: { "kind": "jes", "profile": "test", "path": "" }</pre><button class="copy" type="button">Copy</button></div>
+    <p><code>kind</code> is <code>local</code>, <code>ds</code>, <code>uss</code> or <code>jes</code>; <code>profile</code> is the name of your Zowe connection, and empty means your default one. Normally each pane reopens where you left it; this setting is for forcing a fixed start. Put the two panes on <code>test</code> and <code>prod</code> and F5 copies between the two systems.</p>
+  </div>
+
+  <div class="setting">
+    <h3>What you see first</h3>
+    <div class="cfg"><pre><span class="c">// A DS pane opens on this filter instead of YOURUSER.*</span>
+<span class="k">"mc.ds.defaultFilter"</span>: "PROJ.BILLING.*",
+<span class="c">// A JES pane shows this user's jobs instead of yours</span>
+<span class="k">"mc.jes.owner"</span>: "BATCH01",
+<span class="c">// How often a JES pane refreshes itself, in seconds (0 = never)</span>
+<span class="k">"mc.jes.autoRefreshSeconds"</span>: 5</pre><button class="copy" type="button">Copy</button></div>
+  </div>
+
+  <div class="setting">
+    <h3>Saved views</h3>
+    <p>The easy way: go to the place and press <kbd>Ctrl+D</kbd>. It becomes a ★ tab at the top of the pane. You can also write them yourself, for instance to hand a team the same set:</p>
+    <div class="cfg"><pre><span class="k">"mc.favourites"</span>: [
+  { "name": "My JCL",      "location": { "kind": "ds",  "profile": "prod", "path": "MYUSER.JCL" } },
+  { "name": "Billing jobs", "location": { "kind": "jes", "profile": "prod", "path": "owner=BATCH01;prefix=BIL*;status=output" } }
+]</pre><button class="copy" type="button">Copy</button></div>
+  </div>
+
+  <div class="setting">
+    <h3>Copying with F5</h3>
+    <div class="cfg"><pre><span class="c">// Your site's EBCDIC code page. The default is IBM-277 (Denmark/Norway);</span>
+<span class="c">// IBM-037 is US, IBM-1140 is US with the euro sign, IBM-1047 is Unix-style Latin-1.</span>
+<span class="k">"mc.transfer.codepage"</span>: "IBM-1140",
+<span class="c">// Start copies at once, without the dialog</span>
+<span class="k">"mc.transfer.skipDialog"</span>: true,
+<span class="c">// More file types that always go across as binary</span>
+<span class="k">"mc.transfer.binaryExtensions"</span>: [".gz", ".zip", ".jar", ".pdf", ".png", ".xlsx", ".docx"],
+<span class="c">// A line longer than the data set's record length stops the copy</span>
+<span class="k">"mc.transfer.longLines"</span>: "abort"</pre><button class="copy" type="button">Copy</button></div>
+    <ul>
+      <li>Rather than turning the dialog off, you can keep it and press <kbd>Shift+F5</kbd> whenever you want last time's settings without being asked.</li>
+      <li>Leave <code>longLines</code> on <code>abort</code>. <code>truncate</code> cuts the ends off long lines without telling you, which easily breaks JCL; <code>wrap</code> continues the line on the next record.</li>
+    </ul>
+  </div>
+
+  <div class="setting">
+    <h3>Everything else</h3>
+    <div class="cfg"><pre><span class="k">"mc.theme"</span>: "neon",          <span class="c">// dark neon look, whatever your VS Code theme</span>
+<span class="k">"mc.confirmDelete"</span>: true,    <span class="c">// ask before F8; turn off only if you are sure</span>
+<span class="k">"mc.list.pageSize"</span>: 1000,    <span class="c">// how many rows a listing fetches at a time</span>
+<span class="k">"mc.log.level"</span>: "info"       <span class="c">// "debug" while chasing a problem</span></pre><button class="copy" type="button">Copy</button></div>
+    <ul>
+      <li><em>Mainframe Commander: Switch Theme</em> flips between the standard look, which follows your VS Code colours, and neon.</li>
+      <li>If a very large folder or library is slow to list, lower <code>mc.list.pageSize</code> and the list comes back sooner.</li>
+      <li>With <code>mc.log.level</code> on <code>debug</code>, the log shows every request to the mainframe and how long it took. It never shows passwords.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div>Mainframe Commander is free and open source. Source, issues and the full documentation are on <a href="https://github.com/SMoRG75/mc">GitHub</a>.</div>
+</footer>
+
+</div>
+
+<script>
+document.querySelectorAll('.copy').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var pre = btn.parentElement.querySelector('pre');
+    var text = pre.innerText;
+    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+    var fallback = function () {
+      var range = document.createRange();
+      range.selectNodeContents(pre);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      btn.textContent = 'Press Ctrl+C';
+    };
+    try {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } catch (e) { fallback(); }
+  });
+});
+</script>
+</body>
+</html>
