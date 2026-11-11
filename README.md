@@ -5,6 +5,10 @@ The connection goes through [Zowe](https://www.zowe.org/), so the user's existin
 `zowe.config.json` — certificates, MFA and credential manager included — is the
 only setup required.
 
+New to it? The [user's guide](https://smorg75.github.io/mc/user-guide.html)
+covers what you need, how to start, the keys you'll use most and useful
+settings.
+
 A pane can be on a `zosmf` profile or an `rse` one. An `rse` profile goes
 through IBM's RSE API instead of z/OSMF, and needs IBM's RSE API plug-in for
 Zowe CLI:

@@ -26,14 +26,22 @@
   --key-bg: #ffffff;
   --key-edge: #c3cad8;
   --code-bg: #eef1f6;
-  --mock-bg: #151b27;
-  --mock-pane: #1b2333;
-  --mock-head: #24304a;
-  --mock-fg: #d7deeb;
-  --mock-dim: #7f8ba3;
-  --mock-cursor: #2f6fd6;
-  --mock-mark: #f0c254;
-  --mock-folder: #7cc4e8;
+  --shadow: rgba(16, 24, 40, .28);
+  --mock-frame: #181818;
+  --mock-bg: #1f1f1f;
+  --mock-side: #191919;
+  --mock-head: #252526;
+  --mock-line: #2f2f2f;
+  --mock-fg: #cccccc;
+  --mock-dim: #9d9d9d;
+  --mock-link: #4daafc;
+  --mock-btn: #0078d4;
+  --mock-btn2: #313131;
+  --mock-on: #ffffff;
+  --mock-sel: #04395e;
+  --mock-sel-off: #37373d;
+  --mock-marked: #cca700;
+  --mock-green: #89d185;
   --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
@@ -84,24 +92,52 @@ kbd {
 }
 ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; max-width: 68ch; }
 
-/* The commander mock */
-.mock { background: var(--mock-bg); border-radius: 10px; padding: 10px; font-family: var(--font-mono); font-size: 13px; color: var(--mock-fg); display: flex; flex-direction: column; gap: 8px; }
-.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.pane { background: var(--mock-pane); border-radius: 6px; overflow: hidden; min-width: 0; border: 1px solid transparent; }
-.pane.active { border-color: var(--mock-cursor); }
-.pane-head { background: var(--mock-head); padding: 6px 10px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.world { font-weight: 600; color: #fff; }
-.path { color: var(--mock-dim); overflow-wrap: anywhere; }
-.rows { list-style: none; margin: 0; padding: 4px 0; }
-.rows li { display: flex; justify-content: space-between; gap: 12px; padding: 1px 10px; white-space: nowrap; }
-.rows li span:last-child { color: var(--mock-dim); font-variant-numeric: tabular-nums; }
-.rows .dir span:first-child { color: var(--mock-folder); }
-.rows .marked span:first-child { color: var(--mock-mark); }
-.rows .cursor { background: var(--mock-cursor); }
-.rows .cursor span { color: #fff !important; }
-.fbar { display: flex; flex-wrap: wrap; gap: 4px; }
-.fbar span { flex: 1 1 auto; text-align: center; background: var(--mock-pane); border-radius: 4px; padding: 3px 6px; white-space: nowrap; }
-.fbar b { color: var(--mock-mark); font-weight: 600; margin-right: 4px; }
+/* The commander mock: the panel as it sits in a VS Code editor tab, in a dark theme, mid-copy. */
+.shot { width: min(1060px, calc(100vw - 32px)); margin-left: 50%; transform: translateX(-50%); overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 2px var(--shadow), 0 18px 40px -18px var(--shadow); }
+.mock { min-width: 980px; background: var(--mock-bg); color: var(--mock-fg); font-size: 12px; line-height: 1.4; display: flex; flex-direction: column; }
+.m-tabs { display: flex; background: var(--mock-frame); border-bottom: 1px solid var(--mock-line); }
+.m-tab { display: flex; gap: 10px; align-items: center; padding: 7px 14px; background: var(--mock-bg); border-top: 1px solid var(--mock-btn); margin-bottom: -1px; }
+.m-tab .x { color: var(--mock-dim); }
+.m-panes { display: grid; grid-template-columns: 1fr 1.3fr; }
+.m-pane { min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--mock-line); }
+.m-pane:first-child { border-left: 0; }
+.m-pane.inactive { background: var(--mock-side); }
+.m-head { display: flex; gap: 6px; align-items: center; padding: 5px 6px; }
+.m-pill { display: inline-flex; gap: 8px; border: 1px solid var(--mock-line); background: var(--mock-btn2); border-radius: 3px; padding: 0 6px; font-size: 11px; line-height: 18px; }
+.m-pill .v { color: var(--mock-dim); }
+.m-seg { display: flex; border: 1px solid var(--mock-line); border-radius: 3px; overflow: hidden; }
+.m-seg span { padding: 0 8px; font-size: 11px; line-height: 18px; color: var(--mock-dim); background: var(--mock-btn2); }
+.m-seg span.on { background: var(--mock-btn); color: var(--mock-on); }
+.m-seg.views { margin-left: auto; }
+.m-seg span.saved::before { content: "★"; margin-right: 4px; opacity: .75; }
+.m-path { padding: 3px 8px; font-family: var(--font-mono); font-size: 12px; color: var(--mock-link); border-bottom: 1px solid var(--mock-line); white-space: nowrap; }
+.m-rows { flex: 1; padding-bottom: 8px; font-family: var(--font-mono); font-size: 11.5px; }
+.m-row { display: grid; grid-template-columns: var(--cols); gap: 0 10px; padding: 0 8px; line-height: 19px; white-space: nowrap; }
+.m-row > span { overflow: hidden; text-overflow: ellipsis; }
+.m-row .r { text-align: right; font-variant-numeric: tabular-nums; }
+.m-cols { background: var(--mock-head); color: var(--mock-dim); font-family: var(--font-mono); font-size: 10.5px; border-bottom: 1px solid var(--mock-line); }
+.m-cols .sorted { color: var(--mock-fg); }
+.m-row.up { color: var(--mock-link); }
+.m-row.marked { color: var(--mock-marked); }
+.m-row.cursor { background: var(--mock-sel); outline: 1px solid var(--mock-btn); outline-offset: -1px; }
+.m-pane.inactive .m-row.cursor { background: var(--mock-sel-off); outline: none; }
+.m-foot { display: flex; justify-content: space-between; gap: 12px; padding: 2px 8px; border-top: 1px solid var(--mock-line); background: var(--mock-head); font-family: var(--font-mono); font-size: 11px; color: var(--mock-marked); }
+.m-foot .r { color: var(--mock-dim); }
+.m-local { --cols: 1.4fr .5fr .8fr 1.5fr .5fr; }
+.m-members { --cols: 1fr .6fr 1fr 1.5fr .45fr .45fr .4fr .8fr; }
+.m-cmd { display: flex; gap: 8px; align-items: center; padding: 4px 8px; border-top: 1px solid var(--mock-line); font-family: var(--font-mono); font-size: 12px; }
+.m-cmd .prompt { color: var(--mock-green); }
+.m-caret { display: inline-block; width: 7px; height: 14px; background: var(--mock-fg); animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.m-fkeys { display: flex; gap: 2px; padding: 3px; border-top: 1px solid var(--mock-line); }
+.m-fk { flex: 1; text-align: center; padding: 3px 2px; border: 1px solid var(--mock-line); border-radius: 3px; background: var(--mock-btn2); font-size: 11px; white-space: nowrap; }
+.m-fk b { color: var(--mock-link); margin-right: 4px; font-weight: 600; }
+.m-status { display: flex; gap: 12px; align-items: center; padding: 3px 10px; background: var(--mock-frame); border-top: 1px solid var(--mock-line); font-size: 11.5px; }
+.m-prog { width: 120px; height: 5px; border: 1px solid var(--mock-line); border-radius: 3px; overflow: hidden; }
+.m-prog i { display: block; height: 100%; width: 62%; background: var(--mock-btn); }
+.shot-note { font-size: 13px; color: var(--muted); }
+@media (min-width: 1020px) { .shot-note { display: none; } }
+@media (prefers-reduced-motion: reduce) { .m-caret { animation: none; } }
 .caption { font-size: 14px; color: var(--muted); }
 
 /* Lists of needs and steps */
@@ -123,9 +159,10 @@ ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap:
 /* Settings */
 .setting { display: flex; flex-direction: column; gap: 10px; }
 .cfg { position: relative; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
-.cfg pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; }
+.cfg pre { margin: 0; padding: 14px 72px 14px 16px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; }
 .cfg .c { color: var(--muted); }
 .cfg .k { color: var(--accent); }
+.cfg.short pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .copy { position: absolute; top: 8px; right: 8px; font: 500 12px var(--font-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 3px 9px; cursor: pointer; }
 .copy:hover { border-color: var(--accent); }
 
@@ -133,7 +170,6 @@ footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line)
 
 @media (max-width: 640px) {
   .wrap { padding-block: 28px 48px; gap: 44px; }
-  .panes { grid-template-columns: 1fr; }
   .keys .row { grid-template-columns: 1fr; gap: 4px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -150,33 +186,53 @@ footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line)
 </header>
 
 <section aria-label="What it looks like">
-  <div class="mock" role="img" aria-label="Two panes: a local folder of JCL on the left, the member list of MYUSER.JCL on the right, with the F-key bar below">
-    <div class="panes">
-      <div class="pane">
-        <div class="pane-head"><span class="world">LOCAL</span><span class="path">C:\work\jcl</span></div>
-        <ul class="rows">
-          <li class="dir"><span>..</span><span>&lt;up&gt;</span></li>
-          <li class="dir"><span>old</span><span>&lt;dir&gt;</span></li>
-          <li class="marked"><span>BACKUP.jcl</span><span>1.2 KB</span></li>
-          <li class="marked"><span>COMPILE.jcl</span><span>2.8 KB</span></li>
-          <li><span>REPORT.jcl</span><span>0.9 KB</span></li>
-        </ul>
+  <div class="shot">
+  <div class="mock" role="img" aria-label="The Mainframe Commander panel in VS Code. Left pane: a local folder of JCL with two files marked for copying. Right pane: the member list of MYUSER.JCL on the prod profile, with ISPF statistics. Below: the command line, the F-key bar, and a copy in progress.">
+    <div class="m-tabs"><div class="m-tab">Mainframe Commander <span class="x">×</span></div></div>
+    <div class="m-panes">
+      <div class="m-pane m-local">
+        <div class="m-head">
+          <span class="m-seg"><span class="on">Local</span><span>DS</span><span>USS</span><span>JES</span></span>
+        </div>
+        <div class="m-path">C:\work\jcl</div>
+        <div class="m-row m-cols"><span class="sorted">Name ▲</span><span>Ext</span><span class="r">Size</span><span>Date</span><span>Attr</span></div>
+        <div class="m-rows">
+          <div class="m-row up"><span>..</span><span></span><span></span><span></span><span></span></div>
+          <div class="m-row"><span>old</span><span>—</span><span class="r">&lt;DIR&gt;</span><span>2026/08/30 10:02</span><span>d---</span></div>
+          <div class="m-row marked"><span>BACKUP</span><span>jcl</span><span class="r">1,229</span><span>2026/11/03 09:10</span><span>-a--</span></div>
+          <div class="m-row marked cursor"><span>COMPILE</span><span>jcl</span><span class="r">2,842</span><span>2026/10/28 16:44</span><span>-a--</span></div>
+          <div class="m-row"><span>NIGHTLY</span><span>jcl</span><span class="r">3,915</span><span>2026/11/10 21:58</span><span>-a--</span></div>
+          <div class="m-row"><span>README</span><span>txt</span><span class="r">612</span><span>2026/07/01 12:00</span><span>-a--</span></div>
+        </div>
+        <div class="m-foot"><span>2 of 5 selected — 4,071 bytes</span><span class="r"></span></div>
       </div>
-      <div class="pane active">
-        <div class="pane-head"><span class="world">DS · prod</span><span class="path">MYUSER.JCL</span></div>
-        <ul class="rows">
-          <li class="dir"><span>..</span><span>&lt;up&gt;</span></li>
-          <li class="cursor"><span>BACKUP</span><span>2026-11-03</span></li>
-          <li><span>COMPILE</span><span>2026-10-28</span></li>
-          <li><span>NIGHTLY</span><span>2026-11-10</span></li>
-          <li><span>REPORT</span><span>2026-09-14</span></li>
-        </ul>
+      <div class="m-pane m-members inactive">
+        <div class="m-head">
+          <span class="m-pill">prod ★ <span class="v">▾</span></span>
+          <span class="m-seg"><span>Local</span><span class="on">DS</span><span>USS</span><span>JES</span></span>
+          <span class="m-seg views"><span class="saved on">My JCL</span></span>
+        </div>
+        <div class="m-path">MYUSER.JCL</div>
+        <div class="m-row m-cols"><span class="sorted">Member ▲</span><span>VV.MM</span><span>Created</span><span>Changed</span><span class="r">Size</span><span class="r">Init</span><span class="r">Mod</span><span>ID</span></div>
+        <div class="m-rows">
+          <div class="m-row up"><span>..</span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="m-row"><span>BACKUP</span><span>01.04</span><span>2025/03/18</span><span>2026/11/03 09:12</span><span class="r">42</span><span class="r">40</span><span class="r">3</span><span>MYUSER</span></div>
+          <div class="m-row"><span>CLEANUP</span><span>01.01</span><span>2024/11/20</span><span>2025/06/02 15:47</span><span class="r">18</span><span class="r">17</span><span class="r">1</span><span>MYUSER</span></div>
+          <div class="m-row cursor"><span>NIGHTLY</span><span>02.11</span><span>2023/01/09</span><span>2026/11/10 22:05</span><span class="r">126</span><span class="r">110</span><span class="r">31</span><span>BATCH01</span></div>
+          <div class="m-row"><span>REPORT</span><span>01.00</span><span>2026/09/14</span><span>2026/09/14 08:30</span><span class="r">27</span><span class="r">27</span><span class="r">0</span><span>MYUSER</span></div>
+          <div class="m-row"><span>SORTJOB</span><span>01.02</span><span>2025/12/01</span><span>2026/02/19 11:03</span><span class="r">33</span><span class="r">31</span><span class="r">4</span><span>MYUSER</span></div>
+        </div>
+        <div class="m-foot"><span>5 items</span><span class="r">VOL=WRK014</span></div>
       </div>
     </div>
-    <div class="fbar" aria-hidden="true">
-      <span><b>F1</b>Help</span><span><b>F3</b>View</span><span><b>F4</b>Edit</span><span><b>F5</b>Copy</span><span><b>F6</b>Move</span><span><b>F7</b>New</span><span><b>F8</b>Delete</span><span><b>F9</b>Submit</span>
+    <div class="m-cmd"><span class="prompt">local:C:\work\jcl&gt;</span><span class="m-caret"></span></div>
+    <div class="m-fkeys">
+      <span class="m-fk"><b>F1</b>Help</span><span class="m-fk"><b>F2</b>Refresh</span><span class="m-fk"><b>F3</b>View</span><span class="m-fk"><b>F4</b>Edit</span><span class="m-fk"><b>F5</b>Copy</span><span class="m-fk"><b>F6</b>Move</span><span class="m-fk"><b>F7</b>Create</span><span class="m-fk"><b>F8</b>Delete</span><span class="m-fk"><b>F9</b>Submit</span><span class="m-fk"><b>F10</b>Compare</span>
     </div>
+    <div class="m-status"><span>COMPILE → COMPILE</span><span class="m-prog"><i></i></span><span>2 of 2</span></div>
   </div>
+  </div>
+  <p class="shot-note">Swipe sideways to see the whole panel.</p>
   <p class="caption">Each pane shows one of four places: <strong>Local</strong> (your PC), <strong>DS</strong> (data sets and PDS members), <strong>USS</strong> (z/OS Unix files) or <strong>JES</strong> (your jobs, with their output as files).</p>
 </section>
 
@@ -194,7 +250,7 @@ footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line)
     <div class="need">
       <h3>For RSE connections only</h3>
       <p>If your profile is of type <code>rse</code> rather than <code>zosmf</code>, install IBM's RSE plug-in for Zowe once:</p>
-      <div class="cfg"><pre>zowe plugins install @ibm/rse-api-for-zowe-cli</pre><button class="copy" type="button">Copy</button></div>
+      <div class="cfg short"><pre>zowe plugins install @ibm/rse-api-for-zowe-cli</pre><button class="copy" type="button">Copy</button></div>
     </div>
   </div>
   <p>Both connection types do everything, including TSO commands. Console commands are the one exception: they need a z/OSMF connection.</p>
