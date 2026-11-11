@@ -321,7 +321,10 @@ Zowe v8 API and tested against a real z/OSMF (IBM Z Xplore) with
 `npm run test:host`, alongside the unit tests for the parts that can lose data
 quietly: the EBCDIC tables, LRECL fitting, transfer-mode choice and error
 parsing. Recall of migrated data sets, which Z Xplore cannot show for want of
-DFSMShsm, has been tried by hand on a z/OS that has it, and works.
+DFSMShsm, has been tried by hand on a z/OS that has it, and works. RSE API
+profiles pass the same `npm run test:host` against a simulated RSE API written
+from IBM's swagger for RSE API 1.1.4, and have since been tried on a real
+mainframe, where they work too.
 
 Known limitations:
 
@@ -339,12 +342,10 @@ Known limitations:
   `/D T` gives you a message that makes no sense, please
   [open an issue](https://github.com/SMoRG75/mc/issues) with what the pane
   said and the log at `mc.log.level` `debug`.
-- **RSE API has been tried against a simulated host only.** The pane
-  actions and `tso` pass `npm run test:host` over an `rse` profile, and the
-  pane actions were also tried by hand in VS Code. All of it ran against a
-  simulated RSE API written from IBM's swagger for RSE API 1.1.4. No real
-  RSE API host was within reach. Members are listed whole over RSE, since
-  asking for a page of them needs RSE API 1.1.6. If an `rse` profile does
+- **Members are listed whole over RSE API.** A pane asks z/OSMF for
+  `mc.list.pageSize` members at a time, but asking RSE API for a page of
+  them needs RSE API 1.1.6, so an `rse` pane gets a library's members all at
+  once. If an `rse` profile does
   something a `zosmf` one on the same host does not, please open an issue
   with the log at `mc.log.level` `debug`.
 
